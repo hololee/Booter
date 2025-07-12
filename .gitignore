@@ -6,6 +6,11 @@ dist/
 wheels/
 *.egg-info
 
+# Claude code files
+.claude/
+CLAUDE.md
+
+
 # Virtual environments
 .venv
 
