@@ -125,36 +125,40 @@ class ConnectionManager:
         except Exception as e:
             logger.error(f"상태 브로드캐스트 루프 오류: {e}")
     
-    async def notify_boot_start(self, task_id: str, target_os: str):
+    async def notify_boot_start(self, task_id: str, pc_id: str, target_os: str):
         """부팅 시작 알림"""
         message = {
             "type": "boot_start",
             "data": {
                 "task_id": task_id,
+                "pc_id": pc_id,
                 "target_os": target_os,
                 "message": f"{target_os} 부팅 시작"
             }
         }
         await self.broadcast_message(message)
     
-    async def notify_boot_progress(self, task_id: str, progress: int, message: str):
-        """부팅 진행률 알림"""
+    async def notify_boot_progress(self, task_id: str, pc_id: str, target_os: str, message: str):
+        """부팅 진행 상태 알림"""
         message = {
             "type": "boot_progress",
             "data": {
                 "task_id": task_id,
-                "progress": progress,
+                "pc_id": pc_id,
+                "target_os": target_os,
                 "message": message
             }
         }
         await self.broadcast_message(message)
     
-    async def notify_boot_complete(self, task_id: str, success: bool, message: str):
+    async def notify_boot_complete(self, task_id: str, pc_id: str, target_os: str, success: bool, message: str):
         """부팅 완료 알림"""
         message = {
             "type": "boot_complete",
             "data": {
                 "task_id": task_id,
+                "pc_id": pc_id,
+                "target_os": target_os,
                 "success": success,
                 "message": message
             }

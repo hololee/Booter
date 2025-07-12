@@ -27,7 +27,6 @@ class BootTask:
         self.target_os = target_os
         self.start_time = datetime.now()
         self.status = "starting"
-        self.progress = 0
         self.message = f"{target_os} 부팅 시작"
         self.is_completed = False
         self.is_failed = False
@@ -171,6 +170,10 @@ class PCController:
         task = BootTask(pc_id, "Ubuntu", task_id)
         self.boot_tasks[task_id] = task
         
+        # 부팅 시작 알림
+        from services.connection_manager import connection_manager
+        await connection_manager.notify_boot_start(task_id, pc_id, "Ubuntu")
+        
         # 백그라운드에서 부팅 프로세스 실행
         asyncio.create_task(self._boot_ubuntu_process(task))
         
@@ -178,6 +181,8 @@ class PCController:
     
     async def _boot_ubuntu_process(self, task: BootTask):
         """우분투 부팅 프로세스"""
+        from services.connection_manager import connection_manager
+        
         try:
             wol_service, ssh_service, port_scanner = self._get_or_create_services(task.pc_id)
             
@@ -186,12 +191,12 @@ class PCController:
             if status["state"] == PCState.UBUNTU.value:
                 task.message = "이미 우분투가 실행 중입니다"
                 task.is_completed = True
-                task.progress = 100
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, True, task.message)
                 return
             
             # 2. WOL 전송
             task.message = "Wake-on-LAN 패킷 전송 중..."
-            task.progress = 20
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
             
             success, wol_message = await wol_service.send_wol_with_retry(
                 max_retries=config.MAX_RETRIES,
@@ -201,32 +206,39 @@ class PCController:
             if not success:
                 task.message = f"WOL 전송 실패: {wol_message}"
                 task.is_failed = True
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
                 return
             
             # 3. 우분투 부팅 대기
             task.message = "우분투 부팅 중..."
-            task.progress = 40
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
             
             boot_success = await self._wait_for_ubuntu_boot(task, ssh_service)
             
             if boot_success:
                 task.message = "우분투 부팅 완료"
-                task.progress = 100
                 task.is_completed = True
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, True, task.message)
             else:
                 task.message = "우분투 부팅 타임아웃"
                 task.is_failed = True
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
                 
         except Exception as e:
             logger.error(f"우분투 부팅 프로세스 오류: {e}")
             task.message = f"부팅 오류: {str(e)}"
             task.is_failed = True
+            await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
     
     async def boot_windows(self, pc_id: str) -> str:
         """윈도우 부팅"""
         task_id = str(uuid.uuid4())
         task = BootTask(pc_id, "Windows", task_id)
         self.boot_tasks[task_id] = task
+        
+        # 부팅 시작 알림
+        from services.connection_manager import connection_manager
+        await connection_manager.notify_boot_start(task_id, pc_id, "Windows")
         
         # 백그라운드에서 부팅 프로세스 실행
         asyncio.create_task(self._boot_windows_process(task))
@@ -235,6 +247,8 @@ class PCController:
     
     async def _boot_windows_process(self, task: BootTask):
         """윈도우 부팅 프로세스"""
+        from services.connection_manager import connection_manager
+        
         try:
             wol_service, ssh_service, port_scanner = self._get_or_create_services(task.pc_id)
             
@@ -243,19 +257,20 @@ class PCController:
             if status["state"] == PCState.WINDOWS.value:
                 task.message = "이미 윈도우가 실행 중입니다"
                 task.is_completed = True
-                task.progress = 100
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, True, task.message)
                 return
             
             # 2. 우분투가 실행 중인지 확인
             if status["state"] != PCState.UBUNTU.value:
                 # 우분투가 아니면 먼저 우분투 부팅
                 task.message = "우분투 부팅 중..."
-                task.progress = 10
+                await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
                 
                 success, wol_message = await wol_service.send_wol_with_retry()
                 if not success:
                     task.message = f"WOL 전송 실패: {wol_message}"
                     task.is_failed = True
+                    await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
                     return
                 
                 # 우분투 부팅 대기
@@ -263,36 +278,40 @@ class PCController:
                 if not boot_success:
                     task.message = "우분투 부팅 실패"
                     task.is_failed = True
+                    await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
                     return
             
             # 3. bootWin 명령 실행
             task.message = "윈도우 부팅 명령 실행 중..."
-            task.progress = 60
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
             
             success, boot_message = await ssh_service.boot_to_windows()
             if not success:
                 task.message = f"윈도우 부팅 명령 실패: {boot_message}"
                 task.is_failed = True
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
                 return
             
             # 4. 윈도우 부팅 대기
             task.message = "윈도우 부팅 중..."
-            task.progress = 80
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
             
             windows_success = await self._wait_for_windows_boot(task, port_scanner)
             
             if windows_success:
                 task.message = "윈도우 부팅 완료"
-                task.progress = 100
                 task.is_completed = True
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, True, task.message)
             else:
                 task.message = "윈도우 부팅 타임아웃"
                 task.is_failed = True
+                await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
                 
         except Exception as e:
             logger.error(f"윈도우 부팅 프로세스 오류: {e}")
             task.message = f"부팅 오류: {str(e)}"
             task.is_failed = True
+            await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
     
     async def _wait_for_ubuntu_boot(self, task: BootTask, ssh_service: SSHService) -> bool:
         """우분투 부팅 대기"""
@@ -302,11 +321,6 @@ class PCController:
         while (asyncio.get_event_loop().time() - start_time) < timeout:
             if await ssh_service.is_ubuntu_booted():
                 return True
-            
-            # 진행률 업데이트
-            elapsed = asyncio.get_event_loop().time() - start_time
-            progress = min(40 + (elapsed / timeout) * 40, 80)
-            task.progress = int(progress)
             
             await asyncio.sleep(self.status_check_interval)
         
@@ -320,11 +334,6 @@ class PCController:
         while (asyncio.get_event_loop().time() - start_time) < timeout:
             if await port_scanner.is_windows_booted():
                 return True
-            
-            # 진행률 업데이트
-            elapsed = asyncio.get_event_loop().time() - start_time
-            progress = min(80 + (elapsed / timeout) * 20, 100)
-            task.progress = int(progress)
             
             await asyncio.sleep(self.status_check_interval)
         
@@ -344,7 +353,6 @@ class PCController:
             "pc_name": pc_config.name if pc_config else "Unknown",
             "target_os": task.target_os,
             "status": "completed" if task.is_completed else "failed" if task.is_failed else "running",
-            "progress": task.progress,
             "message": task.message,
             "start_time": task.start_time.isoformat(),
             "is_completed": task.is_completed,

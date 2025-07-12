@@ -5,8 +5,12 @@ class MultiPCController {
         this.maxReconnectAttempts = 5;
         this.reconnectInterval = 1000;
         this.pcs = new Map();
-        this.activeTasks = new Map();
+        this.bootingPCs = new Map(); // 부팅 중인 PC들과 정보 추적 {pcId: {startTime, targetOS}}
+        this.bootTimeoutDuration = 3 * 60 * 1000; // 3분 (밀리초)
         this.isEditing = false;
+        
+        // localStorage에서 부팅 상태 복원
+        this.loadBootingStatusFromStorage();
         this.currentEditingPcId = null;
         
         this.initializeElements();
@@ -23,10 +27,6 @@ class MultiPCController {
         // PC 그리드
         this.pcGrid = document.getElementById('pcGrid');
         
-        // 작업 관련 요소들
-        this.tasksCard = document.getElementById('tasksCard');
-        this.tasksList = document.getElementById('tasksList');
-        this.taskCount = document.getElementById('taskCount');
         
         // 모달 요소들
         this.pcModal = document.getElementById('pcModal');
@@ -200,6 +200,20 @@ class MultiPCController {
         this.pcs.forEach(pc => {
             const pcCard = this.createPCCard(pc);
             this.pcGrid.appendChild(pcCard);
+            
+            // 복원된 부팅 상태가 있으면 UI에 반영
+            if (this.bootingPCs.has(pc.id)) {
+                const bootInfo = this.bootingPCs.get(pc.id);
+                this.updatePCBootStatus(pc.id, this.getBootingStatusText(bootInfo.targetOS, 'booting'));
+                
+                // 부팅 중일 때 버튼 비활성화
+                const ubuntuBtn = document.getElementById(`ubuntu-btn-${pc.id}`);
+                const windowsBtn = document.getElementById(`windows-btn-${pc.id}`);
+                if (ubuntuBtn && windowsBtn) {
+                    ubuntuBtn.disabled = true;
+                    windowsBtn.disabled = true;
+                }
+            }
         });
     }
     
@@ -259,9 +273,6 @@ class MultiPCController {
             });
         }
         
-        if (data.active_tasks) {
-            this.updateActiveTasks(data.active_tasks);
-        }
     }
     
     updatePCStatus(pcId, status) {
@@ -273,6 +284,27 @@ class MultiPCController {
         
         if (!statusDot || !statusText || !lastCheck || !ubuntuBtn || !windowsBtn) {
             return;
+        }
+        
+        // 부팅 중인 PC 타임아웃 체크
+        if (this.bootingPCs.has(pcId)) {
+            const bootInfo = this.bootingPCs.get(pcId);
+            const now = Date.now();
+            
+            // 3분이 지났으면 부팅 상태에서 제거
+            if (now - bootInfo.startTime > this.bootTimeoutDuration) {
+                this.removeBootingPC(pcId);
+                console.log(`PC ${pcId} 부팅 타임아웃: 3분 경과로 부팅 상태 해제`);
+            } else {
+                // 아직 3분이 안 지났으면 상태 업데이트 무시 (부팅 메시지 보존)
+                if (status.timestamp) {
+                    lastCheck.textContent = this.formatTimestamp(status.timestamp);
+                }
+                // 부팅 중에는 모든 버튼 비활성화
+                ubuntuBtn.disabled = true;
+                windowsBtn.disabled = true;
+                return;
+            }
         }
         
         // 상태 점 업데이트
@@ -299,57 +331,11 @@ class MultiPCController {
             lastCheck.textContent = this.formatTimestamp(status.timestamp);
         }
         
-        // 버튼 상태 업데이트
-        const hasActiveTasks = status.active_tasks > 0;
-        ubuntuBtn.disabled = hasActiveTasks || status.state === 'ubuntu';
-        windowsBtn.disabled = hasActiveTasks || status.state === 'windows';
-        
-        // 로딩 상태 표시
-        if (hasActiveTasks) {
-            ubuntuBtn.classList.add('loading');
-            windowsBtn.classList.add('loading');
-        } else {
-            ubuntuBtn.classList.remove('loading');
-            windowsBtn.classList.remove('loading');
-        }
+        // 버튼 상태 업데이트 (현재 상태에 따라서만)
+        ubuntuBtn.disabled = status.state === 'ubuntu';
+        windowsBtn.disabled = status.state === 'windows';
     }
     
-    updateActiveTasks(tasks) {
-        this.activeTasks.clear();
-        
-        tasks.forEach(task => {
-            this.activeTasks.set(task.task_id, task);
-        });
-        
-        if (tasks.length > 0) {
-            this.taskCount.textContent = tasks.length;
-            this.tasksCard.style.display = 'block';
-            
-            this.tasksList.innerHTML = '';
-            tasks.forEach(task => {
-                const taskElement = this.createTaskElement(task);
-                this.tasksList.appendChild(taskElement);
-            });
-        } else {
-            this.tasksCard.style.display = 'none';
-        }
-    }
-    
-    createTaskElement(task) {
-        const taskElement = document.createElement('div');
-        taskElement.className = 'task-item';
-        taskElement.id = `task-${task.task_id}`;
-        
-        taskElement.innerHTML = `
-            <div class="task-info">
-                <div class="task-title">${task.pc_name} - ${task.target_os} 부팅</div>
-                <div class="task-message">${task.message}</div>
-            </div>
-            <div class="task-progress">${task.progress}%</div>
-        `;
-        
-        return taskElement;
-    }
     
     // PC 관리 메서드들
     openAddPcModal() {
@@ -554,6 +540,10 @@ class MultiPCController {
     // 부팅 메서드들
     async bootUbuntu(pcId) {
         try {
+            // 부팅 시작 전에 즉시 부팅 상태로 설정
+            this.addBootingPC(pcId, 'Ubuntu');
+            this.updatePCBootStatus(pcId, this.getBootingStatusText('Ubuntu', 'requesting'));
+            
             const response = await fetch(`/api/pcs/${pcId}/boot/ubuntu`, {
                 method: 'POST'
             });
@@ -563,17 +553,25 @@ class MultiPCController {
             if (response.ok) {
                 this.showNotification(`Ubuntu 부팅을 시작했습니다`, 'success');
             } else {
+                // 요청 실패 시 부팅 상태에서 제거
+                this.removeBootingPC(pcId);
                 this.showNotification(result.detail || 'Ubuntu 부팅 요청 실패', 'error');
             }
             
         } catch (error) {
             console.error('Ubuntu 부팅 오류:', error);
+            // 오류 시 부팅 상태에서 제거
+            this.removeBootingPC(pcId);
             this.showNotification('Ubuntu 부팅 요청 중 오류가 발생했습니다', 'error');
         }
     }
     
     async bootWindows(pcId) {
         try {
+            // 부팅 시작 전에 즉시 부팅 상태로 설정
+            this.addBootingPC(pcId, 'Windows');
+            this.updatePCBootStatus(pcId, this.getBootingStatusText('Windows', 'requesting'));
+            
             const response = await fetch(`/api/pcs/${pcId}/boot/windows`, {
                 method: 'POST'
             });
@@ -583,11 +581,15 @@ class MultiPCController {
             if (response.ok) {
                 this.showNotification(`Windows 부팅을 시작했습니다`, 'success');
             } else {
+                // 요청 실패 시 부팅 상태에서 제거
+                this.removeBootingPC(pcId);
                 this.showNotification(result.detail || 'Windows 부팅 요청 실패', 'error');
             }
             
         } catch (error) {
             console.error('Windows 부팅 오류:', error);
+            // 오류 시 부팅 상태에서 제거
+            this.removeBootingPC(pcId);
             this.showNotification('Windows 부팅 요청 중 오류가 발생했습니다', 'error');
         }
     }
@@ -620,22 +622,128 @@ class MultiPCController {
     // 이벤트 핸들러들
     handleBootStart(data) {
         this.showNotification(`${data.target_os} 부팅을 시작합니다`, 'info');
+        // 부팅 중인 PC로 추가 (시작 시간과 타겟 OS 함께)
+        this.addBootingPC(data.pc_id, data.target_os);
+        // PC 상태 텍스트 업데이트
+        this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'booting'));
     }
     
     handleBootProgress(data) {
-        const taskElement = document.getElementById(`task-${data.task_id}`);
-        if (taskElement) {
-            const messageElement = taskElement.querySelector('.task-message');
-            const progressElement = taskElement.querySelector('.task-progress');
-            
-            if (messageElement) messageElement.textContent = data.message;
-            if (progressElement) progressElement.textContent = `${data.progress}%`;
-        }
+        // PC 상태 텍스트 업데이트
+        this.updatePCBootStatus(data.pc_id, data.message);
     }
     
     handleBootComplete(data) {
         const type = data.success ? 'success' : 'error';
         this.showNotification(data.message, type);
+        
+        // 부팅 완료/실패 시 부팅 중 상태에서 제거
+        this.removeBootingPC(data.pc_id);
+        
+        // 상태 텍스트 업데이트
+        if (data.success) {
+            this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'completed'));
+        } else {
+            this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'failed'));
+        }
+        
+        // 성공한 경우 버튼 상태도 즉시 업데이트
+        if (data.success) {
+            const ubuntuBtn = document.getElementById(`ubuntu-btn-${data.pc_id}`);
+            const windowsBtn = document.getElementById(`windows-btn-${data.pc_id}`);
+            if (ubuntuBtn && windowsBtn) {
+                if (data.target_os === 'Ubuntu') {
+                    ubuntuBtn.disabled = true;
+                    windowsBtn.disabled = false;
+                } else if (data.target_os === 'Windows') {
+                    ubuntuBtn.disabled = false;
+                    windowsBtn.disabled = true;
+                }
+            }
+        }
+    }
+    
+    updatePCBootStatus(pcId, statusText) {
+        const statusTextElement = document.getElementById(`status-text-${pcId}`);
+        if (statusTextElement) {
+            statusTextElement.textContent = statusText;
+        }
+    }
+    
+    // 부팅 상태 텍스트 표준화
+    getBootingStatusText(targetOS, stage = 'booting') {
+        const osName = targetOS === 'Ubuntu' ? 'Ubuntu' : targetOS === 'Windows' ? 'Windows' : targetOS;
+        
+        switch (stage) {
+            case 'requesting':
+                return `${osName} 부팅 요청중`;
+            case 'booting':
+                return `${osName} 부팅중`;
+            case 'completed':
+                return `${osName} 부팅 완료`;
+            case 'failed':
+                return `${osName} 부팅 실패`;
+            default:
+                return `${osName} 부팅중`;
+        }
+    }
+    
+    // localStorage에 부팅 상태 저장
+    saveBootingStatusToStorage() {
+        try {
+            const bootingData = {};
+            this.bootingPCs.forEach((bootInfo, pcId) => {
+                bootingData[pcId] = bootInfo;
+            });
+            localStorage.setItem('bootingPCs', JSON.stringify(bootingData));
+        } catch (error) {
+            console.error('부팅 상태 저장 실패:', error);
+        }
+    }
+    
+    // localStorage에서 부팅 상태 복원
+    loadBootingStatusFromStorage() {
+        try {
+            const bootingDataStr = localStorage.getItem('bootingPCs');
+            if (bootingDataStr) {
+                const bootingData = JSON.parse(bootingDataStr);
+                const now = Date.now();
+                
+                Object.entries(bootingData).forEach(([pcId, bootInfo]) => {
+                    // 이전 버전 호환성 처리 (startTime이 숫자인 경우)
+                    if (typeof bootInfo === 'number') {
+                        bootInfo = { startTime: bootInfo, targetOS: 'Unknown' };
+                    }
+                    
+                    // 3분이 지나지 않은 것만 복원
+                    if (now - bootInfo.startTime <= this.bootTimeoutDuration) {
+                        this.bootingPCs.set(pcId, bootInfo);
+                        console.log(`PC ${pcId} ${bootInfo.targetOS} 부팅 상태 복원`);
+                    }
+                });
+                
+                // 복원 후 저장소 업데이트 (만료된 항목 제거)
+                this.saveBootingStatusToStorage();
+            }
+        } catch (error) {
+            console.error('부팅 상태 복원 실패:', error);
+            localStorage.removeItem('bootingPCs');
+        }
+    }
+    
+    // 부팅 상태 추가 (localStorage 동기화)
+    addBootingPC(pcId, targetOS = 'Unknown') {
+        this.bootingPCs.set(pcId, {
+            startTime: Date.now(),
+            targetOS: targetOS
+        });
+        this.saveBootingStatusToStorage();
+    }
+    
+    // 부팅 상태 제거 (localStorage 동기화)
+    removeBootingPC(pcId) {
+        this.bootingPCs.delete(pcId);
+        this.saveBootingStatusToStorage();
     }
     
     // 유틸리티 메서드들
@@ -659,13 +767,13 @@ class MultiPCController {
     
     getStateDisplayName(state) {
         const stateNames = {
-            'ubuntu': 'Ubuntu',
-            'windows': 'Windows',
+            'ubuntu': 'Ubuntu 동작중',
+            'windows': 'Windows 동작중',
             'off': '꺼짐',
             'booting': '부팅 중',
-            'unknown': '불명'
+            'unknown': '상태 불명'
         };
-        return stateNames[state] || '불명';
+        return stateNames[state] || '상태 불명';
     }
     
     formatTimestamp(timestamp) {
