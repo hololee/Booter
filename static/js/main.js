@@ -332,7 +332,7 @@ class MultiPCController {
         }
         
         // 버튼 상태 업데이트 (현재 상태에 따라서만)
-        ubuntuBtn.disabled = status.state === 'ubuntu';
+        ubuntuBtn.disabled = status.state === 'ubuntu' || status.state === 'windows';
         windowsBtn.disabled = status.state === 'windows';
     }
     
