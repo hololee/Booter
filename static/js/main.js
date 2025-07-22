@@ -204,7 +204,7 @@ class MultiPCController {
             // 복원된 부팅 상태가 있으면 UI에 반영
             if (this.bootingPCs.has(pc.id)) {
                 const bootInfo = this.bootingPCs.get(pc.id);
-                this.updatePCBootStatus(pc.id, this.getBootingStatusText(bootInfo.targetOS, 'booting'));
+                this.updatePCBootStatus(pc.id, this.getBootingStatusText(bootInfo.targetOS, 'booting'), 'booting');
                 
                 // 부팅 중일 때 버튼 비활성화
                 const ubuntuBtn = document.getElementById(`ubuntu-btn-${pc.id}`);
@@ -288,22 +288,27 @@ class MultiPCController {
         
         // 부팅 중인 PC 타임아웃 체크
         if (this.bootingPCs.has(pcId)) {
+            // PC가 부팅 중인 것으로 기록되어 있을 때
             const bootInfo = this.bootingPCs.get(pcId);
             const now = Date.now();
-            
-            // 3분이 지났으면 부팅 상태에서 제거
-            if (now - bootInfo.startTime > this.bootTimeoutDuration) {
+
+            if (status.state === 'ubuntu' || status.state === 'windows') {
+                // 부팅이 완료된 상태(ubuntu/windows)를 받으면, 부팅 중 상태를 해제하고 상태 업데이트를 계속 진행
+                this.removeBootingPC(pcId);
+            } else if (now - bootInfo.startTime > this.bootTimeoutDuration) {
+                // 부팅 타임아웃이 지난 경우, 부팅 상태를 해제하고 상태 업데이트를 계속 진행
                 this.removeBootingPC(pcId);
                 console.log(`PC ${pcId} 부팅 타임아웃: 3분 경과로 부팅 상태 해제`);
             } else {
-                // 아직 3분이 안 지났으면 상태 업데이트 무시 (부팅 메시지 보존)
+                // 부팅이 아직 완료되지 않았고 타임아웃도 지나지 않았으면,
+                // 현재 상태 업데이트를 무시하고 '부팅 중' 상태를 유지
                 if (status.timestamp) {
                     lastCheck.textContent = this.formatTimestamp(status.timestamp);
                 }
                 // 부팅 중에는 모든 버튼 비활성화
                 ubuntuBtn.disabled = true;
                 windowsBtn.disabled = true;
-                return;
+                return; // 여기서 함수를 종료하여 '부팅 중' UI 유지
             }
         }
         
@@ -311,16 +316,13 @@ class MultiPCController {
         statusDot.className = 'pc-status-dot';
         switch (status.state) {
             case 'ubuntu':
-                statusDot.classList.add('ubuntu');
-                break;
             case 'windows':
-                statusDot.classList.add('windows');
+                statusDot.classList.add('online');
                 break;
             case 'off':
-                statusDot.classList.add('offline');
-                break;
             default:
                 statusDot.classList.add('offline');
+                break;
         }
         
         // 상태 텍스트 업데이트
@@ -542,7 +544,7 @@ class MultiPCController {
         try {
             // 부팅 시작 전에 즉시 부팅 상태로 설정
             this.addBootingPC(pcId, 'Ubuntu');
-            this.updatePCBootStatus(pcId, this.getBootingStatusText('Ubuntu', 'requesting'));
+            this.updatePCBootStatus(pcId, this.getBootingStatusText('Ubuntu', 'requesting'), 'booting');
             
             const response = await fetch(`/api/pcs/${pcId}/boot/ubuntu`, {
                 method: 'POST'
@@ -570,7 +572,7 @@ class MultiPCController {
         try {
             // 부팅 시작 전에 즉시 부팅 상태로 설정
             this.addBootingPC(pcId, 'Windows');
-            this.updatePCBootStatus(pcId, this.getBootingStatusText('Windows', 'requesting'));
+            this.updatePCBootStatus(pcId, this.getBootingStatusText('Windows', 'requesting'), 'booting');
             
             const response = await fetch(`/api/pcs/${pcId}/boot/windows`, {
                 method: 'POST'
@@ -625,7 +627,7 @@ class MultiPCController {
         // 부팅 중인 PC로 추가 (시작 시간과 타겟 OS 함께)
         this.addBootingPC(data.pc_id, data.target_os);
         // PC 상태 텍스트 업데이트
-        this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'booting'));
+        this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'booting'), 'booting');
     }
     
     handleBootProgress(data) {
@@ -640,11 +642,11 @@ class MultiPCController {
         // 부팅 완료/실패 시 부팅 중 상태에서 제거
         this.removeBootingPC(data.pc_id);
         
-        // 상태 텍스트 업데이트
+        // 상태 텍스트 및 점 업데이트
         if (data.success) {
-            this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'completed'));
+            this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'completed'), 'online');
         } else {
-            this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'failed'));
+            this.updatePCBootStatus(data.pc_id, this.getBootingStatusText(data.target_os, 'failed'), 'offline');
         }
         
         // 성공한 경우 버튼 상태도 즉시 업데이트
@@ -663,10 +665,18 @@ class MultiPCController {
         }
     }
     
-    updatePCBootStatus(pcId, statusText) {
+    updatePCBootStatus(pcId, statusText, statusClass = null) {
         const statusTextElement = document.getElementById(`status-text-${pcId}`);
         if (statusTextElement) {
             statusTextElement.textContent = statusText;
+        }
+
+        if (statusClass) {
+            const statusDot = document.getElementById(`status-dot-${pcId}`);
+            if (statusDot) {
+                statusDot.className = 'pc-status-dot';
+                statusDot.classList.add(statusClass);
+            }
         }
     }
     
