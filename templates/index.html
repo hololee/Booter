@@ -41,32 +41,32 @@
             <div class="modal-body">
                 <form id="pcForm">
                     <div class="form-group">
-                        <label for="pcName">PC 이름</label>
+                        <label for="pcName">PC 이름 <span class="required">*</span></label>
                         <input type="text" id="pcName" name="name" required>
                         <small>고유한 PC 이름 (예: 게임용 PC, 사무용 PC)</small>
                     </div>
                     <div class="form-group">
-                        <label for="description">설명 (선택사항)</label>
+                        <label for="description">설명</label>
                         <input type="text" id="description" name="description" maxlength="12" placeholder="최대 12자">
                         <small>PC를 구별할 수 있는 간단한 설명 (최대 12자)</small>
                     </div>
                     <div class="form-group">
-                        <label for="macAddress">MAC 주소</label>
+                        <label for="macAddress">MAC 주소 <span class="required">*</span></label>
                         <input type="text" id="macAddress" name="mac_address" required pattern="^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$" title="MAC 주소는 AA:BB:CC:DD:EE:FF 형식이어야 합니다" placeholder="예: AA:BB:CC:DD:EE:FF">
                         <small>형식: AA:BB:CC:DD:EE:FF</small>
                     </div>
                     <div class="form-group">
-                        <label for="ipAddress">IP 주소</label>
+                        <label for="ipAddress">IP 주소 <span class="required">*</span></label>
                         <input type="text" id="ipAddress" name="ip_address" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" title="IP 주소는 192.168.1.100 형식이어야 합니다" placeholder="예: 192.168.1.100">
                         <small>형식: 192.168.1.100</small>
                     </div>
                     <div class="form-group">
-                        <label for="sshUser">SSH 사용자</label>
+                        <label for="sshUser">SSH 사용자 <span class="required">*</span></label>
                         <input type="text" id="sshUser" name="ssh_user" required>
                         <small>SSH 접속 사용자명</small>
                     </div>
                     <div class="form-group">
-                        <label for="sshPassword">SSH 비밀번호 (필수)</label>
+                        <label for="sshPassword">SSH 비밀번호 <span class="required">*</span></label>
                         <div class="password-input-container">
                             <input type="password" id="sshPassword" name="ssh_password" required>
                             <button type="button" class="password-toggle-btn" id="sshPasswordToggle">
@@ -76,22 +76,22 @@
                         <small>sudo 명령 실행용 비밀번호 (항상 필수)</small>
                     </div>
                     <div class="form-group">
-                        <label for="sshKeyText">SSH 개인키 (선택사항)</label>
+                        <label for="sshKeyText">SSH 개인키</label>
                         <textarea id="sshKeyText" name="ssh_key_text" rows="6" placeholder="-----BEGIN PRIVATE KEY-----&#10;키 내용을 여기에 붙여넣기&#10;-----END PRIVATE KEY-----"></textarea>
                         <small>SSH 개인키가 있으면 키로 접속, 없으면 비밀번호로 접속</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="sshPort">SSH 포트</label>
+                            <label for="sshPort">SSH 포트 <span class="required">*</span></label>
                             <input type="number" id="sshPort" name="ssh_port" value="22" min="1" max="65535">
                         </div>
                         <div class="form-group">
-                            <label for="rdpPort">RDP 포트</label>
+                            <label for="rdpPort">RDP 포트 <span class="required">*</span></label>
                             <input type="number" id="rdpPort" name="rdp_port" value="3389" min="1" max="65535">
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="bootCommand">부팅 명령</label>
+                        <label for="bootCommand">부팅 명령 <span class="required">*</span></label>
                         <input type="text" id="bootCommand" name="boot_command" placeholder="sudo grub-reboot {N_menu} && sudo reboot">
                         <small>윈도우 부팅을 위한 실제 명령어 (alias 사용 불가)</small>
                     </div>
