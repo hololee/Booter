@@ -81,6 +81,9 @@ class MultiPCController {
         // SSH 인증 방법 변경 이벤트
         this.sshAuthMethod.addEventListener('change', () => this.toggleSshAuthMethod());
         
+        // SSH 비밀번호 토글 이벤트
+        document.getElementById('sshPasswordToggle').addEventListener('click', () => this.togglePasswordVisibility());
+        
         // 모달 배경 클릭 시 닫기 비활성화 (PC 모달만)
         this.deleteModal.addEventListener('click', (e) => {
             if (e.target === this.deleteModal) this.closeDeleteModal();
@@ -833,6 +836,20 @@ class MultiPCController {
             this.sshPasswordGroup.style.display = 'none';
             document.getElementById('sshKeyText').required = true;
             document.getElementById('sshPassword').required = false;
+        }
+    }
+    
+    togglePasswordVisibility() {
+        const passwordInput = document.getElementById('sshPassword');
+        const toggleBtn = document.getElementById('sshPasswordToggle');
+        const eyeIcon = toggleBtn.querySelector('.eye-icon');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            eyeIcon.textContent = '👁‍🗨'; // 닫힌 눈 아이콘
+        } else {
+            passwordInput.type = 'password';
+            eyeIcon.textContent = '👁'; // 열린 눈 아이콘
         }
     }
     

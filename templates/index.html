@@ -79,7 +79,12 @@
                     </div>
                     <div class="form-group" id="sshPasswordGroup" style="display: none;">
                         <label for="sshPassword">SSH 비밀번호</label>
-                        <input type="password" id="sshPassword" name="ssh_password">
+                        <div class="password-input-container">
+                            <input type="password" id="sshPassword" name="ssh_password">
+                            <button type="button" class="password-toggle-btn" id="sshPasswordToggle">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
                         <small>SSH 접속 및 sudo 명령 실행용 비밀번호</small>
                     </div>
                     <div class="form-row">
