@@ -225,7 +225,7 @@ class MultiPCController {
             <div class="pc-card-header">
                 <div class="pc-card-title">
                     <span class="pc-status-dot" id="status-dot-${pc.id}"></span>
-                    <span class="pc-name">${pc.name}</span>
+                    <span class="pc-name" ${pc.description ? `title="${pc.description}"` : ''}>${pc.name}</span>
                 </div>
                 <div class="pc-card-actions">
                     <button class="btn btn-small btn-secondary" onclick="app.openEditPcModal('${pc.id}')">편집</button>
