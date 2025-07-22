@@ -542,6 +542,7 @@ body {
         flex-direction: column;
         gap: 20px;
         text-align: center;
+        padding: 10px 24px; /* 모바일 헤더 높이 줄임 */
     }
     
     .title {
@@ -643,6 +644,7 @@ body {
     text-align: center;
     padding: 60px 20px;
     color: #6b7280;
+    grid-column: 1 / -1; /* 그리드의 모든 열을 차지 */
 }
 
 .empty-state h3 {

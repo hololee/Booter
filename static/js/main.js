@@ -189,7 +189,6 @@ class MultiPCController {
                 <div class="empty-state">
                     <h3>등록된 PC가 없습니다</h3>
                     <p>새 PC를 추가하여 시작하세요</p>
-                    <button class="btn btn-primary" onclick="app.openAddPcModal()">PC 추가</button>
                 </div>
             `;
             return;
