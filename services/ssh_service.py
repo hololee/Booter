@@ -1,16 +1,18 @@
 import paramiko
+from paramiko.ssh_exception import NoValidConnectionsError
 import asyncio
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 from pathlib import Path
 from config import config
 
 logger = logging.getLogger(__name__)
 
+
 class SSHService:
     """SSH 연결 및 원격 명령 실행 서비스"""
     
-    def __init__(self, pc_config: 'PCConfig' = None):
+    def __init__(self, pc_config=None):
         from config import PCConfig
         pc_config = pc_config or config.DEFAULT_PC_CONFIG
         self.host = pc_config.ip_address
@@ -81,7 +83,7 @@ class SSHService:
                 
         except paramiko.AuthenticationException:
             return False, "SSH 인증 실패"
-        except paramiko.NoValidConnectionsError:
+        except NoValidConnectionsError:
             return False, f"SSH 연결 실패: {self.host}:{self.port}에 연결할 수 없습니다"
         except paramiko.SSHException as e:
             return False, f"SSH 오류: {str(e)}"
@@ -257,32 +259,11 @@ class SSHService:
             # 명령이 이미 sudo를 포함하는지 확인
             if self.auth_method == "password" and self.password:
                 if "sudo" in command:
-                    # 복합 명령에서 각 sudo 명령에 개별적으로 비밀번호 제공
-                    # && 로 연결된 명령들을 분리하여 각각에 echo | sudo -S 적용
-                    commands = command.split(" && ")
-                    processed_commands = []
-                    
-                    for cmd in commands:
-                        cmd = cmd.strip()
-                        if cmd.startswith("sudo"):
-                            # sudo 명령인 경우 echo로 비밀번호 제공
-                            processed_cmd = f"echo \"{self.password}\" | {cmd.replace('sudo', 'sudo -S', 1)}"
-                            processed_commands.append(processed_cmd)
-                        else:
-                            # sudo가 아닌 명령은 그대로
-                            processed_commands.append(cmd)
-                    
-                    actual_command = " && ".join(processed_commands)
-                    # 로그용 마스킹된 버전
-                    masked_commands = []
-                    for cmd in commands:
-                        cmd = cmd.strip()
-                        if cmd.startswith("sudo"):
-                            masked_cmd = f"echo \"[PASSWORD]\" | {cmd.replace('sudo', 'sudo -S', 1)}"
-                            masked_commands.append(masked_cmd)
-                        else:
-                            masked_commands.append(cmd)
-                    full_command = " && ".join(masked_commands)
+                    # sudo 명령이 포함된 경우, bash -c로 감싸서 단일 세션에서 실행
+                    # 첫 번째 sudo에만 비밀번호를 제공하고, sudo 세션을 유지
+                    escaped_command = command.replace('"', '\\"')
+                    full_command = f"echo \"[PASSWORD]\" | sudo -S bash -c \"{escaped_command}\""
+                    actual_command = f"echo \"{self.password}\" | sudo -S bash -c \"{escaped_command}\""
                 else:
                     # 명령에 sudo가 없는 경우, sudo -S 추가
                     full_command = f"echo \"[PASSWORD]\" | sudo -S {command}"
@@ -298,6 +279,10 @@ class SSHService:
                     actual_command = command
                 
             logger.info(f"sudo 명령 실행: {full_command}")  # 비밀번호 마스킹된 버전
+            
+            # .bashrc 오류를 무시하기 위해 2>/dev/null 추가
+            if "sudo" in actual_command:
+                actual_command = f"bash -c '{actual_command} 2>/dev/null || {actual_command}'"
             
             stdin, stdout, stderr = ssh.exec_command(actual_command)
             
@@ -386,6 +371,7 @@ class SSHService:
             return False, "", str(e)
         finally:
             ssh.close()
+
 
 # 전역 SSH 서비스 인스턴스
 ssh_service = SSHService()
