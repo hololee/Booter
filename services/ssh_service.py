@@ -47,20 +47,30 @@ class SSHService:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
         try:
-            # SSH 연결 (인증 방법에 따라 분기)
-            if self.auth_method == "key":
+            # SSH 연결 (키가 있으면 키 우선, 없으면 비밀번호)
+            if self.key_text or self.key_path:
                 private_key = self._load_private_key()
-                if not private_key:
-                    return False, "SSH 키 로드 실패"
-                    
-                ssh.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    pkey=private_key,
-                    timeout=self.timeout
-                )
-            else:  # password
+                if private_key:
+                    ssh.connect(
+                        hostname=self.host,
+                        port=self.port,
+                        username=self.username,
+                        pkey=private_key,
+                        timeout=self.timeout
+                    )
+                else:
+                    # 키 로드 실패 시 비밀번호로 fallback
+                    if not self.password:
+                        return False, "SSH 키 로드 실패 및 비밀번호 없음"
+                    ssh.connect(
+                        hostname=self.host,
+                        port=self.port,
+                        username=self.username,
+                        password=self.password,
+                        timeout=self.timeout
+                    )
+            else:
+                # 키가 없으면 비밀번호 사용
                 if not self.password:
                     return False, "SSH 비밀번호가 설정되지 않았습니다"
                     
@@ -231,20 +241,30 @@ class SSHService:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
         try:
-            # SSH 연결
-            if self.auth_method == "key":
+            # SSH 연결 (키가 있으면 키 우선, 없으면 비밀번호)
+            if self.key_text or self.key_path:
                 private_key = self._load_private_key()
-                if not private_key:
-                    return False, "", "SSH 키 로드 실패"
-                    
-                ssh.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    pkey=private_key,
-                    timeout=self.timeout
-                )
-            else:  # password
+                if private_key:
+                    ssh.connect(
+                        hostname=self.host,
+                        port=self.port,
+                        username=self.username,
+                        pkey=private_key,
+                        timeout=self.timeout
+                    )
+                else:
+                    # 키 로드 실패 시 비밀번호로 fallback
+                    if not self.password:
+                        return False, "", "SSH 키 로드 실패 및 비밀번호 없음"
+                    ssh.connect(
+                        hostname=self.host,
+                        port=self.port,
+                        username=self.username,
+                        password=self.password,
+                        timeout=self.timeout
+                    )
+            else:
+                # 키가 없으면 비밀번호 사용
                 if not self.password:
                     return False, "", "SSH 비밀번호가 설정되지 않았습니다"
                     
@@ -256,27 +276,20 @@ class SSHService:
                     timeout=self.timeout
                 )
             
-            # 명령이 이미 sudo를 포함하는지 확인
-            if self.auth_method == "password" and self.password:
-                if "sudo" in command:
-                    # sudo 명령이 포함된 경우, bash -c로 감싸서 단일 세션에서 실행
-                    # 첫 번째 sudo에만 비밀번호를 제공하고, sudo 세션을 유지
-                    escaped_command = command.replace('"', '\\"')
-                    full_command = f"echo \"[PASSWORD]\" | sudo -S bash -c \"{escaped_command}\""
-                    actual_command = f"echo \"{self.password}\" | sudo -S bash -c \"{escaped_command}\""
-                else:
-                    # 명령에 sudo가 없는 경우, sudo -S 추가
-                    full_command = f"echo \"[PASSWORD]\" | sudo -S {command}"
-                    actual_command = f"echo \"{self.password}\" | sudo -S {command}"
+            # sudo 명령은 항상 비밀번호 사용
+            if not self.password:
+                return False, "", "sudo 명령 실행을 위한 비밀번호가 필요합니다"
+                
+            if "sudo" in command:
+                # sudo 명령이 포함된 경우, bash -c로 감싸서 단일 세션에서 실행
+                # 첫 번째 sudo에만 비밀번호를 제공하고, sudo 세션을 유지
+                escaped_command = command.replace('"', '\\"')
+                full_command = f"echo \"[PASSWORD]\" | sudo -S bash -c \"{escaped_command}\""
+                actual_command = f"echo \"{self.password}\" | sudo -S bash -c \"{escaped_command}\""
             else:
-                # 키 기반: passwordless sudo
-                if "sudo" not in command:
-                    full_command = f"sudo {command}"
-                    actual_command = full_command
-                else:
-                    # 명령에 이미 sudo가 포함된 경우 그대로 실행
-                    full_command = command
-                    actual_command = command
+                # 명령에 sudo가 없는 경우, sudo -S 추가
+                full_command = f"echo \"[PASSWORD]\" | sudo -S {command}"
+                actual_command = f"echo \"{self.password}\" | sudo -S {command}"
                 
             logger.info(f"sudo 명령 실행: {full_command}")  # 비밀번호 마스킹된 버전
             

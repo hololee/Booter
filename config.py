@@ -51,11 +51,12 @@ class Config:
         mac_address=os.getenv("PC_MAC", "AA:BB:CC:DD:EE:FF"),
         ip_address=os.getenv("PC_IP", "192.168.1.100"),
         ssh_user=os.getenv("SSH_USER", "ubuntu"),
-        ssh_auth_method="key",
+        ssh_auth_method=os.getenv("SSH_KEY_PATH", "~/.ssh/id_rsa") and "key" or "password",
         ssh_key_path=os.getenv("SSH_KEY_PATH", "~/.ssh/id_rsa"),
+        ssh_password=os.getenv("SSH_PASSWORD", ""),
         ssh_port=int(os.getenv("SSH_PORT", "22")),
         rdp_port=int(os.getenv("RDP_PORT", "3389")),
-        boot_command=os.getenv("BOOT_COMMAND", "bootWin"),
+        boot_command=os.getenv("BOOT_COMMAND", "sudo grub-reboot 1 && sudo reboot"),
         description="기본 PC 설정"
     )
     

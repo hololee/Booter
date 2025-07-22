@@ -49,10 +49,7 @@ class MultiPCController {
         this.keepEditingBtn = document.getElementById('keepEditingBtn');
         this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
         
-        // SSH 인증 방법 관련 요소들
-        this.sshAuthMethod = document.getElementById('sshAuthMethod');
-        this.sshKeyGroup = document.getElementById('sshKeyGroup');
-        this.sshPasswordGroup = document.getElementById('sshPasswordGroup');
+        // SSH 관련 요소들
         
         // 알림 컨테이너
         this.notificationContainer = document.getElementById('notificationContainer');
@@ -78,8 +75,6 @@ class MultiPCController {
         this.keepEditingBtn.addEventListener('click', () => this.closeCancelModal());
         this.confirmCancelBtn.addEventListener('click', () => this.confirmCancel());
         
-        // SSH 인증 방법 변경 이벤트
-        this.sshAuthMethod.addEventListener('change', () => this.toggleSshAuthMethod());
         
         // SSH 비밀번호 토글 이벤트
         document.getElementById('sshPasswordToggle').addEventListener('click', () => this.togglePasswordVisibility());
@@ -369,15 +364,9 @@ class MultiPCController {
         document.getElementById('description').value = pc.description || '';
         document.getElementById('isActive').checked = pc.is_active;
         
-        // SSH 인증 방법 설정
-        document.getElementById('sshAuthMethod').value = pc.ssh_auth_method || 'key';
-        if (pc.ssh_auth_method === 'password') {
-            document.getElementById('sshPassword').value = pc.ssh_password || '';
-        } else {
-            document.getElementById('sshKeyText').value = pc.ssh_key_text || '';
-        }
-        
-        this.toggleSshAuthMethod();
+        // SSH 설정
+        document.getElementById('sshPassword').value = pc.ssh_password || '';
+        document.getElementById('sshKeyText').value = pc.ssh_key_text || '';
         this.pcModal.classList.add('show');
     }
     
@@ -441,7 +430,9 @@ class MultiPCController {
             mac_address: formData.get('mac_address'),
             ip_address: formData.get('ip_address'),
             ssh_user: formData.get('ssh_user'),
-            ssh_auth_method: formData.get('ssh_auth_method'),
+            ssh_password: formData.get('ssh_password'),
+            ssh_key_text: formData.get('ssh_key_text'),
+            ssh_auth_method: formData.get('ssh_key_text') ? 'key' : 'password', // 키가 있으면 key, 없으면 password
             ssh_port: parseInt(formData.get('ssh_port')),
             rdp_port: parseInt(formData.get('rdp_port')),
             boot_command: formData.get('boot_command'),
@@ -449,19 +440,10 @@ class MultiPCController {
             is_active: formData.get('is_active') === 'on'
         };
         
-        // SSH 인증 방법에 따라 필드 추가
-        if (pcData.ssh_auth_method === 'password') {
-            pcData.ssh_password = formData.get('ssh_password');
-            if (!pcData.ssh_password) {
-                this.showNotification('SSH 비밀번호를 입력해주세요', 'error');
-                return;
-            }
-        } else {
-            pcData.ssh_key_text = formData.get('ssh_key_text');
-            if (!pcData.ssh_key_text) {
-                this.showNotification('SSH 키를 입력해주세요', 'error');
-                return;
-            }
+        // SSH 비밀번호는 항상 필수
+        if (!pcData.ssh_password) {
+            this.showNotification('SSH 비밀번호를 입력해주세요', 'error');
+            return;
         }
         
         console.log('Sending PC data:', pcData);
@@ -820,23 +802,6 @@ class MultiPCController {
         }
         
         return finalId;
-    }
-    
-    // SSH 인증 방법 변경 처리
-    toggleSshAuthMethod() {
-        const authMethod = this.sshAuthMethod.value;
-        
-        if (authMethod === 'password') {
-            this.sshKeyGroup.style.display = 'none';
-            this.sshPasswordGroup.style.display = 'block';
-            document.getElementById('sshKeyText').required = false;
-            document.getElementById('sshPassword').required = true;
-        } else {
-            this.sshKeyGroup.style.display = 'block';
-            this.sshPasswordGroup.style.display = 'none';
-            document.getElementById('sshKeyText').required = true;
-            document.getElementById('sshPassword').required = false;
-        }
     }
     
     togglePasswordVisibility() {

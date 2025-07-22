@@ -66,26 +66,19 @@
                         <small>SSH 접속 사용자명</small>
                     </div>
                     <div class="form-group">
-                        <label for="sshAuthMethod">SSH 인증 방법</label>
-                        <select id="sshAuthMethod" name="ssh_auth_method" required>
-                            <option value="key">SSH 키</option>
-                            <option value="password">비밀번호</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="sshKeyGroup">
-                        <label for="sshKeyText">SSH 개인키</label>
-                        <textarea id="sshKeyText" name="ssh_key_text" rows="6" placeholder="-----BEGIN PRIVATE KEY-----&#10;키 내용을 여기에 붙여넣기&#10;-----END PRIVATE KEY-----"></textarea>
-                        <small>SSH 개인키 전체 내용을 붙여넣기</small>
-                    </div>
-                    <div class="form-group" id="sshPasswordGroup" style="display: none;">
-                        <label for="sshPassword">SSH 비밀번호</label>
+                        <label for="sshPassword">SSH 비밀번호 (필수)</label>
                         <div class="password-input-container">
-                            <input type="password" id="sshPassword" name="ssh_password">
+                            <input type="password" id="sshPassword" name="ssh_password" required>
                             <button type="button" class="password-toggle-btn" id="sshPasswordToggle">
                                 <span class="eye-icon">👁</span>
                             </button>
                         </div>
-                        <small>SSH 접속 및 sudo 명령 실행용 비밀번호</small>
+                        <small>sudo 명령 실행용 비밀번호 (항상 필수)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="sshKeyText">SSH 개인키 (선택사항)</label>
+                        <textarea id="sshKeyText" name="ssh_key_text" rows="6" placeholder="-----BEGIN PRIVATE KEY-----&#10;키 내용을 여기에 붙여넣기&#10;-----END PRIVATE KEY-----"></textarea>
+                        <small>SSH 개인키가 있으면 키로 접속, 없으면 비밀번호로 접속</small>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
