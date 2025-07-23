@@ -1,0 +1,32 @@
+services:
+  wol-service:
+    build: .
+    ports:
+      - "80:8000"  # HTTP 포트
+    volumes:
+      # 영속 데이터 저장
+      - wol-data:/app/data
+      # SSH 키 파일 (호스트에서 마운트)
+      - ./ssh_keys:/app/ssh_keys:ro
+    networks:
+      - wol-network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  wol-network:
+    driver: bridge
+
+volumes:
+  wol-data:
+    driver: local

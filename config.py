@@ -42,23 +42,9 @@ class Config:
     """애플리케이션 설정"""
     
     # PC 데이터 저장 경로
-    PC_DATA_FILE = Path("pc_data.json")
+    DATA_DIR = Path("data")
+    PC_DATA_FILE = DATA_DIR / "pc_data.json"
     
-    # 기본 PC 설정 (환경변수 또는 기본값 사용)
-    DEFAULT_PC_CONFIG = PCConfig(
-        id="default-pc",
-        name=os.getenv("PC_NAME", "DualBoot-PC"),
-        mac_address=os.getenv("PC_MAC", "AA:BB:CC:DD:EE:FF"),
-        ip_address=os.getenv("PC_IP", "192.168.1.100"),
-        ssh_user=os.getenv("SSH_USER", "ubuntu"),
-        ssh_auth_method=os.getenv("SSH_KEY_PATH", "~/.ssh/id_rsa") and "key" or "password",
-        ssh_key_path=os.getenv("SSH_KEY_PATH", "~/.ssh/id_rsa"),
-        ssh_password=os.getenv("SSH_PASSWORD", ""),
-        ssh_port=int(os.getenv("SSH_PORT", "22")),
-        rdp_port=int(os.getenv("RDP_PORT", "3389")),
-        boot_command=os.getenv("BOOT_COMMAND", "sudo grub-reboot 1 && sudo reboot"),
-        description="기본 PC 설정"
-    )
     
     # 타임아웃 설정
     BOOT_TIMEOUT = int(os.getenv("BOOT_TIMEOUT", "300"))  # 5분
@@ -93,18 +79,20 @@ class PCManager:
                         pc_config = PCConfig(**pc_data)
                         self.pcs[pc_config.id] = pc_config
             else:
-                # 기본 PC 설정 추가
-                self.pcs[self.config.DEFAULT_PC_CONFIG.id] = self.config.DEFAULT_PC_CONFIG
+                # 초기에는 빈 PC 목록으로 시작
                 self.save_pcs()
         except Exception as e:
             print(f"PC 설정 로드 실패: {e}")
-            # 기본 PC 설정으로 초기화
-            self.pcs[self.config.DEFAULT_PC_CONFIG.id] = self.config.DEFAULT_PC_CONFIG
+            # 오류 시에도 빈 PC 목록으로 초기화
+            self.pcs = {}
             self.save_pcs()
     
     def save_pcs(self):
         """PC 설정 파일 저장"""
         try:
+            # data 디렉터리 생성
+            self.config.DATA_DIR.mkdir(exist_ok=True)
+            
             data = {
                 'pcs': [pc.dict() for pc in self.pcs.values()],
                 'version': '1.0'

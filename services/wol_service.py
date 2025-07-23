@@ -10,7 +10,7 @@ class WOLService:
     """Wake-on-LAN 서비스"""
     
     def __init__(self, mac_address: str = None):
-        self.mac_address = mac_address or config.DEFAULT_PC_CONFIG.mac_address
+        self.mac_address = mac_address
         self.broadcast_ip = "255.255.255.255"
         self.port = 9
     
@@ -26,6 +26,9 @@ class WOLService:
         """
         try:
             target_mac = mac_address or self.mac_address
+            
+            if not target_mac:
+                return False, "MAC 주소가 지정되지 않았습니다"
             
             # MAC 주소 정규화
             normalized_mac = target_mac.replace(':', '').replace('-', '').upper()

@@ -12,9 +12,10 @@ logger = logging.getLogger(__name__)
 class SSHService:
     """SSH 연결 및 원격 명령 실행 서비스"""
     
-    def __init__(self, pc_config=None):
+    def __init__(self, pc_config):
         from config import PCConfig
-        pc_config = pc_config or config.DEFAULT_PC_CONFIG
+        if pc_config is None:
+            raise ValueError("pc_config is required")
         self.host = pc_config.ip_address
         self.username = pc_config.ssh_user
         self.auth_method = pc_config.ssh_auth_method
@@ -386,5 +387,4 @@ class SSHService:
             ssh.close()
 
 
-# 전역 SSH 서비스 인스턴스
-ssh_service = SSHService()
+# 전역 SSH 서비스 인스턴스는 제거 (PC별로 개별 생성)

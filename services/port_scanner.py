@@ -9,9 +9,10 @@ logger = logging.getLogger(__name__)
 class PortScanner:
     """포트 스캔 서비스"""
     
-    def __init__(self, pc_config: 'PCConfig' = None):
+    def __init__(self, pc_config: 'PCConfig'):
         from config import PCConfig
-        pc_config = pc_config or config.DEFAULT_PC_CONFIG
+        if pc_config is None:
+            raise ValueError("pc_config is required")
         self.host = pc_config.ip_address
         self.rdp_port = pc_config.rdp_port
         self.ssh_port = pc_config.ssh_port
@@ -138,5 +139,4 @@ class PortScanner:
             "details": results
         }
 
-# 전역 포트 스캐너 인스턴스
-port_scanner = PortScanner()
+# 전역 포트 스캐너 인스턴스는 제거 (PC별로 개별 생성)
