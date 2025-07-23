@@ -688,3 +688,48 @@ body {
     background: #f8fafc;
     color: #64748b;
 }
+
+/* 비밀번호 입력 필드 스타일 */
+.password-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-container input {
+    padding-right: 45px; /* 버튼 공간 확보 */
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.password-toggle-btn:hover {
+    opacity: 1;
+}
+
+.eye-icon {
+    font-size: 16px;
+    user-select: none;
+}
+
+/* 필수 입력 필드 표시 */
+.required {
+    color: #ef4444 !important;
+    font-weight: bold;
+    margin-left: 2px;
+}
+
+label .required {
+    color: #ef4444 !important;
+}
