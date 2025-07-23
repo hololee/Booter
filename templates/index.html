@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booter</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}">
+    <link rel="stylesheet" href="/static/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -12,7 +12,9 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <h1 class="title">Booter</h1>
+            <h1 class="title">
+                <img src="/static/resources/logo.svg" alt="Booter" class="logo">
+            </h1>
             <div class="header-actions">
                 <button class="btn btn-primary" id="addPcBtn">PC 추가</button>
                 <button class="btn btn-secondary" id="refreshAllBtn">전체 새로고침</button>
@@ -151,7 +153,7 @@
     <!-- 알림 컨테이너 -->
     <div class="notification-container" id="notificationContainer"></div>
 
-    <script src="{{ url_for('static', path='/js/main.js') }}"></script>
+    <script src="/static/js/main.js"></script>
 </body>
 </html>
 
