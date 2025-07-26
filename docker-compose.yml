@@ -1,8 +1,7 @@
 services:
   wol-service:
     build: .
-    ports:
-      - "80:8000"
+    network_mode: host
     volumes:
       - wol-data:/app/data
       # - ./ssh_keys:/app/ssh_keys:ro  # SSH 키 파일 마운트 (선택사항)
@@ -15,10 +14,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-networks:
-  wol-network:
-    driver: bridge
 
 volumes:
   wol-data:
