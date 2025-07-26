@@ -29,7 +29,7 @@ jobs:
         args: "--max-line-length=120 --extend-ignore=E203,W503 --exclude=.git,__pycache__,.venv,venv,build,dist"
 
     - name: Run Isort
-      uses: isort/isort-action@v2
+      uses: isort/isort-action@v1
       with:
         requirements: "uv.lock"
         args: "--check-only --diff --profile black --line-length 120"
