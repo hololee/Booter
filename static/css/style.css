@@ -18,7 +18,7 @@ body {
 .app-container {
     display: flex;
     flex: 1;
-    padding-top: 62px; /* 헤더 하단 패딩 감소에 맞춤 */
+    padding-top: 70px; /* 헤더 아래 패딩 증가 */
 }
 
 .container {
@@ -47,7 +47,7 @@ body {
 .header {
     background-color: #ffffff;
     border-bottom: 1px solid #e2e8f0;
-    padding: 10px 20px 6px 12px; /* 하단 패딩을 줄임 */
+    padding: 12px 20px 12px 12px; /* 상하 패딩 12px로 통일 */
     position: fixed;
     top: 0;
     left: 0;
@@ -198,7 +198,7 @@ body {
     transition: transform 0.3s ease;
     opacity: 1 !important;
     box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-    padding-top: 62px; /* 헤더 하단 패딩 감소에 맞춤 */
+    padding-top: 58px; /* 헤더 높이에 정확히 맞춤 (12+12+1+border) */
     box-sizing: border-box;
 }
 
@@ -210,7 +210,7 @@ body {
 }
 
 .sidebar-content {
-    padding: 20px 0;
+    padding: 0; /* 패딩 제거 */
     background-color: #ffffff !important;
     height: 100%;
 }
@@ -223,19 +223,18 @@ body {
 }
 
 .menu-item {
-    margin-bottom: 4px;
+    margin-bottom: 0; /* 여백 제거 */
     background-color: transparent !important;
 }
 
 .menu-button {
     width: 100%;
-    padding: 12px 24px;
+    padding: 16px 24px; /* 패딩을 늘려서 높이 확보 */
     border: none;
     background: transparent !important;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 12px;
     font-size: 0.95rem;
     color: #64748b !important;
     transition: all 0.2s ease;
@@ -249,9 +248,9 @@ body {
 }
 
 .menu-item.active .menu-button {
-    background-color: #eff6ff !important;
-    color: #3b82f6 !important;
-    border-right: 3px solid #3b82f6;
+    background-color: #f5f5f5 !important;
+    color: #374151 !important;
+    border-right: none; /* 파란색 바 제거 */
 }
 
 .menu-icon {
@@ -797,7 +796,7 @@ body {
 /* 반응형 디자인 */
 @media (max-width: 768px) {
     .app-container {
-        padding-top: 60px; /* 모바일 헤더 하단 패딩 감소에 맞춤 */
+        padding-top: 70px; /* 모바일 헤더 아래 패딩 증가 */
     }
     
     .container {
@@ -806,7 +805,7 @@ body {
     }
     
     .header {
-        padding: 12px 16px 8px 8px; /* 모바일에서 하단 패딩 줄임 */
+        padding: 12px 16px 12px 8px; /* 모바일에서도 상하 패딩 12px로 통일 */
     }
     
     .header-content {
@@ -852,7 +851,7 @@ body {
     .sidebar {
         top: 0; /* 헤더와 완전히 맞춤 */
         height: 100vh;
-        padding-top: 60px; /* 모바일 헤더 하단 패딩 감소에 맞춤 */
+        padding-top: 58px; /* 모바일 헤더 높이에 맞춤 (12+12+1+border) */
         transform: translateX(-100%); /* 기본적으로 숨김 */
         box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
     }
