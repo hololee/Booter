@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booter</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="/static/resources/favicon_light.svg" type="image/svg+xml" media="(prefers-color-scheme: light)">
+    <link rel="icon" href="/static/resources/favicon_dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -68,7 +70,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalTitle">PC 추가</h3>
-                <button class="close-btn" id="closeModalBtn">×</button>
             </div>
             <div class="modal-body">
                 <form id="pcForm">
@@ -102,7 +103,7 @@
                         <div class="password-input-container">
                             <input type="password" id="sshPassword" name="ssh_password" required>
                             <button type="button" class="password-toggle-btn" id="sshPasswordToggle">
-                                <span class="eye-icon">👁</span>
+                                <img src="/static/resources/show.svg" alt="Show Password" class="eye-icon" id="passwordToggleIcon">
                             </button>
                         </div>
                         <small>sudo 명령 실행용 비밀번호 (항상 필수)</small>
@@ -127,14 +128,7 @@
                         <input type="text" id="bootCommand" name="boot_command" placeholder="sudo grub-reboot {N_menu} && sudo reboot">
                         <small>윈도우 부팅을 위한 실제 명령어 (alias 사용 불가)</small>
                     </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="isActive" name="is_active" checked>
-                            <span class="checkmark"></span>
-                            활성화
-                        </label>
-                    </div>
-                </form>
+                    </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="cancelBtn">취소</button>
@@ -148,7 +142,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>PC 삭제</h3>
-                <button class="close-btn" id="closeDeleteModalBtn">×</button>
             </div>
             <div class="modal-body">
                 <p>정말로 이 PC를 삭제하시겠습니까?</p>
@@ -167,7 +160,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>변경사항 취소</h3>
-                <button class="close-btn" id="closeCancelModalBtn">×</button>
             </div>
             <div class="modal-body">
                 <p>입력하신 내용이 저장되지 않습니다.</p>

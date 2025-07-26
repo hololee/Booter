@@ -21,7 +21,6 @@ class PCConfig(BaseModel):
     rdp_port: int = Field(default=3389, description="RDP 포트")
     boot_command: str = Field(default="grub-reboot Windows && reboot", description="Windows 부팅 명령")
     description: Optional[str] = Field(None, description="PC 설명")
-    is_active: bool = Field(default=True, description="활성화 상태")
 
     class Config:
         json_schema_extra = {
@@ -36,7 +35,6 @@ class PCConfig(BaseModel):
                 "rdp_port": 3389,
                 "boot_command": "bootWin",
                 "description": "게임용 듀얼부팅 PC",
-                "is_active": True,
             }
         }
 
@@ -159,7 +157,7 @@ class PCManager:
 
     def get_active_pcs(self) -> List[PCConfig]:
         """활성 PC 조회"""
-        return [pc for pc in self.pcs.values() if pc.is_active]
+        return list(self.pcs.values())
 
 
 # 전역 PC 관리자 인스턴스

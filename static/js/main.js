@@ -48,20 +48,17 @@ class MultiPCController {
         this.pcModal = document.getElementById('pcModal');
         this.pcForm = document.getElementById('pcForm');
         this.modalTitle = document.getElementById('modalTitle');
-        this.closeModalBtn = document.getElementById('closeModalBtn');
         this.cancelBtn = document.getElementById('cancelBtn');
         this.saveBtn = document.getElementById('saveBtn');
         
         // 삭제 모달
         this.deleteModal = document.getElementById('deleteModal');
         this.deletePcName = document.getElementById('deletePcName');
-        this.closeDeleteModalBtn = document.getElementById('closeDeleteModalBtn');
         this.cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
         this.confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
         
         // 취소 확인 모달
         this.cancelModal = document.getElementById('cancelModal');
-        this.closeCancelModalBtn = document.getElementById('closeCancelModalBtn');
         this.keepEditingBtn = document.getElementById('keepEditingBtn');
         this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
         
@@ -91,17 +88,14 @@ class MultiPCController {
         this.refreshAllBtn.addEventListener('click', () => this.refreshAllPCs());
         
         // 모달 이벤트
-        this.closeModalBtn.addEventListener('click', () => this.showCancelConfirmation());
         this.cancelBtn.addEventListener('click', () => this.showCancelConfirmation());
         this.pcForm.addEventListener('submit', (e) => this.handlePcSubmit(e));
         
         // 삭제 모달 이벤트
-        this.closeDeleteModalBtn.addEventListener('click', () => this.closeDeleteModal());
         this.cancelDeleteBtn.addEventListener('click', () => this.closeDeleteModal());
         this.confirmDeleteBtn.addEventListener('click', () => this.confirmDeletePc());
         
         // 취소 확인 모달 이벤트
-        this.closeCancelModalBtn.addEventListener('click', () => this.closeCancelModal());
         this.keepEditingBtn.addEventListener('click', () => this.closeCancelModal());
         this.confirmCancelBtn.addEventListener('click', () => this.confirmCancel());
         
@@ -215,30 +209,9 @@ class MultiPCController {
     }
     
     async loadVMs() {
-        try {
-            // vm_data.json 파일을 직접 요청
-            const response = await fetch('/static/vm_data.json');
-            
-            if (!response.ok) {
-                throw new Error('VM 데이터 파일을 찾을 수 없습니다');
-            }
-            
-            const data = await response.json();
-            
-            this.pcs.clear();
-            if (Array.isArray(data) && data.length > 0) {
-                data.forEach(vm => {
-                    this.pcs.set(vm.id, vm);
-                });
-                this.renderPCGrid();
-            } else {
-                this.renderEmptyVMState();
-            }
-            
-        } catch (error) {
-            console.error('VM 목록 로드 실패:', error);
-            this.renderEmptyVMState();
-        }
+        // VM 기능은 현재 개발 예정입니다.
+        // 이 함수는 현재 아무런 동작도 하지 않습니다.
+        this.renderEmptyVMState();
     }
     
     renderPCGrid() {
@@ -436,7 +409,6 @@ class MultiPCController {
         document.getElementById('rdpPort').value = pc.rdp_port;
         document.getElementById('bootCommand').value = pc.boot_command;
         document.getElementById('description').value = pc.description || '';
-        document.getElementById('isActive').checked = pc.is_active;
         
         // SSH 설정
         document.getElementById('sshPassword').value = pc.ssh_password || '';
@@ -510,8 +482,7 @@ class MultiPCController {
             ssh_port: parseInt(formData.get('ssh_port')),
             rdp_port: parseInt(formData.get('rdp_port')),
             boot_command: formData.get('boot_command'),
-            description: formData.get('description'),
-            is_active: formData.get('is_active') === 'on'
+            description: formData.get('description')
         };
         
         // SSH 비밀번호는 항상 필수
@@ -880,15 +851,16 @@ class MultiPCController {
     
     togglePasswordVisibility() {
         const passwordInput = document.getElementById('sshPassword');
-        const toggleBtn = document.getElementById('sshPasswordToggle');
-        const eyeIcon = toggleBtn.querySelector('.eye-icon');
+        const passwordToggleIcon = document.getElementById('passwordToggleIcon');
         
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
-            eyeIcon.textContent = '👁‍🗨'; // 닫힌 눈 아이콘
+            passwordToggleIcon.src = '/static/resources/hide.svg';
+            passwordToggleIcon.alt = 'Hide Password';
         } else {
             passwordInput.type = 'password';
-            eyeIcon.textContent = '👁'; // 열린 눈 아이콘
+            passwordToggleIcon.src = '/static/resources/show.svg';
+            passwordToggleIcon.alt = 'Show Password';
         }
     }
     

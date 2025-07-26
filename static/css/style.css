@@ -81,7 +81,7 @@ body {
 .title .logo {
     height: 1.6rem;
     width: auto;
-    filter: brightness(0) saturate(100%);
+    filter: brightness(0) invert(0); /* 흰색을 검은색으로 변경 */
     margin: 4px 0; /* 위아래 여백 추가 */
 }
 
@@ -337,7 +337,7 @@ body {
 /* PC 그리드 */
 .pc-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 20px;
 }
 
@@ -1011,7 +1011,7 @@ body {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 5px;
+    padding: 0px; /* 패딩 제거 */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1024,8 +1024,9 @@ body {
 }
 
 .eye-icon {
-    font-size: 16px;
-    user-select: none;
+    filter: brightness(0) invert(0); /* 흰색을 검은색으로 변경 */
+    width: 16px; /* 아이콘 너비 설정 */
+    height: 16px; /* 아이콘 높이 설정 */
 }
 
 /* 필수 입력 필드 표시 */
