@@ -1,8 +1,9 @@
-import os
 import json
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, List
+import os
 from pathlib import Path
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class PCConfig(BaseModel):
@@ -10,7 +11,7 @@ class PCConfig(BaseModel):
 
     id: str = Field(..., description="PC 고유 식별자")
     name: str = Field(..., description="PC 이름")
-    mac_address: str = Field(..., description="MAC 주소", pattern=r'^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$')
+    mac_address: str = Field(..., description="MAC 주소", pattern=r"^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")
     ip_address: str = Field(..., description="IP 주소")
     ssh_user: str = Field(..., description="SSH 사용자명")
     ssh_auth_method: str = Field(default="key", description="SSH 인증 방법 (key/password)")
@@ -74,9 +75,9 @@ class PCManager:
         """PC 설정 파일 로드"""
         try:
             if self.config.PC_DATA_FILE.exists():
-                with open(self.config.PC_DATA_FILE, 'r', encoding='utf-8') as f:
+                with open(self.config.PC_DATA_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    for pc_data in data.get('pcs', []):
+                    for pc_data in data.get("pcs", []):
                         pc_config = PCConfig(**pc_data)
                         self.pcs[pc_config.id] = pc_config
             else:
@@ -94,8 +95,8 @@ class PCManager:
             # data 디렉터리 생성
             self.config.DATA_DIR.mkdir(exist_ok=True)
 
-            data = {'pcs': [pc.dict() for pc in self.pcs.values()], 'version': '1.0'}
-            with open(self.config.PC_DATA_FILE, 'w', encoding='utf-8') as f:
+            data = {"pcs": [pc.dict() for pc in self.pcs.values()], "version": "1.0"}
+            with open(self.config.PC_DATA_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"PC 설정 저장 실패: {e}")
