@@ -29,7 +29,7 @@ jobs:
         path: "."
 
     - name: Run Isort
-      uses: isort/isort-action@v3
+      uses: isort/isort-action@v2
       with:
         requirements: "uv.lock"
         args: "--check-only --diff"
