@@ -12,23 +12,55 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <h1 class="title">
-                <img src="/static/resources/logo.svg" alt="Booter" class="logo">
-            </h1>
+            <div class="header-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <span class="hamburger-line"></span>
+                    <span class="hamburger-line"></span>
+                    <span class="hamburger-line"></span>
+                </button>
+                <h1 class="title">
+                    <img src="/static/resources/logo.svg" alt="Booter" class="logo">
+                </h1>
+            </div>
             <div class="header-actions">
                 <button class="btn btn-primary" id="addPcBtn">PC 추가</button>
-                <button class="btn btn-secondary" id="refreshAllBtn">전체 새로고침</button>
+                <button class="btn btn-secondary" id="refreshAllBtn">새로고침</button>
             </div>
         </div>
     </header>
 
-    <div class="container">
-        <main class="main-content">
-            <!-- PC 목록 -->
-            <div class="pc-grid" id="pcGrid">
-                <!-- PC 카드들이 동적으로 추가됨 -->
-            </div>
-        </main>
+    <!-- 사이드바 메뉴 -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <ul class="menu-list">
+                <li class="menu-item active" data-menu="pc">
+                    <button class="menu-button">
+                        <span class="menu-icon">💻</span>
+                        <span class="menu-text">PC</span>
+                    </button>
+                </li>
+                <li class="menu-item" data-menu="vm">
+                    <button class="menu-button">
+                        <span class="menu-icon">🖥️</span>
+                        <span class="menu-text">VM</span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 모바일 오버레이 -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <div class="app-container">
+        <div class="container">
+            <main class="main-content">
+                <!-- PC 목록 -->
+                <div class="pc-grid" id="pcGrid">
+                    <!-- PC 카드들이 동적으로 추가됨 -->
+                </div>
+            </main>
+        </div>
     </div>
 
     
@@ -157,13 +189,3 @@
 </body>
 </html>
 
-<style>
-/* 추가적인 스타일 */
-.pc-card-actions .btn-small {
-    display: none; /* 기본적으로 숨김 */
-}
-
-.pc-card:hover .pc-card-actions .btn-small {
-    display: inline-block; /* 호버 시 보임 */
-}
-</style>
