@@ -21,6 +21,9 @@ FastAPI-based web service for controlling multiple dual-boot PCs remotely using 
 ```bash
 # 실행
 docker-compose up -d
+
+# 접속
+# {IP}:8000
 ```
 
 ## 사용법
