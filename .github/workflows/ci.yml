@@ -25,6 +25,9 @@ jobs:
 
     - name: Run Flake8
       uses: py-actions/flake8@v2
+      with:
+        path: .
+        args: "--config=pyproject.toml"
 
     - name: Run Isort
       uses: isort/isort-action@v1
