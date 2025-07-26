@@ -2,6 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   lint:
@@ -20,20 +23,19 @@ jobs:
     - name: Run Black
       uses: psf/black@stable
       with:
-        options: "--check --diff"
+        options: "--check --diff --line-length 120"
         src: "."
 
     - name: Run Flake8
       uses: py-actions/flake8@v2
       with:
-        path: .
-        args: "--config=pyproject.toml"
+        args: "--max-line-length=120 --extend-ignore=E203,W503 --exclude=.git,__pycache__,.venv,venv,build,dist"
 
     - name: Run Isort
-      uses: isort/isort-action@v1
+      uses: isort/isort-action@v2
       with:
         requirements: "uv.lock"
-        args: "--check-only --diff"
+        args: "--check-only --diff --profile black --line-length 120"
 
   test:
     runs-on: ubuntu-latest
