@@ -2,12 +2,10 @@ services:
   wol-service:
     build: .
     ports:
-      - "8000:8000"
+      - "80:8000"
     volumes:
-      # PC 설정 데이터 영속성
-      - ./data:/app/data
-      # SSH 키 파일 마운트 (선택사항)
-      - ./ssh_keys:/app/ssh_keys:ro
+      - wol-data:/app/data
+      # - ./ssh_keys:/app/ssh_keys:ro  # SSH 키 파일 마운트 (선택사항)
     networks:
       - wol-network
     restart: unless-stopped
@@ -21,3 +19,7 @@ services:
 networks:
   wol-network:
     driver: bridge
+
+volumes:
+  wol-data:
+    driver: local
