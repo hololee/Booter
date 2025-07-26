@@ -5,8 +5,6 @@ services:
     volumes:
       - wol-data:/app/data
       # - ./ssh_keys:/app/ssh_keys:ro  # SSH 키 파일 마운트 (선택사항)
-    networks:
-      - wol-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
