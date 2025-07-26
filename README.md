@@ -1,6 +1,8 @@
-# WOL Manager
+# Booter
 
 FastAPI-based web service for controlling multiple dual-boot PCs remotely using Wake-on-LAN.
+
+![타이틀](./imgs/title.png)
 
 ## 기능
 
@@ -13,28 +15,8 @@ FastAPI-based web service for controlling multiple dual-boot PCs remotely using 
 ## Docker로 실행 (권장)
 
 ```bash
-# SSH 키 디렉터리 생성 (선택사항)
-mkdir -p ssh_keys
-cp ~/.ssh/id_rsa ssh_keys/
-
-# 프로덕션 환경으로 실행
-docker-compose -f docker-compose.prod.yml up -d
-
-# 웹 인터페이스 접속
-# http://localhost 또는 http://your-server-ip
-```
-
-## 개발 환경
-
-```bash
-# 의존성 설치
-uv sync
-
-# 개발 서버 실행
-uv run uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-
-# 웹 인터페이스 접속
-# http://localhost:8000
+# 실행
+docker-compose up -d
 ```
 
 ## 사용법
