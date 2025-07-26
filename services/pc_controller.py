@@ -66,7 +66,7 @@ class PCController:
         
         # WOL 서비스
         if pc_id not in self.wol_services:
-            self.wol_services[pc_id] = WOLService(pc_config.mac_address)
+            self.wol_services[pc_id] = WOLService(pc_config)
         
         # SSH 서비스
         if pc_id not in self.ssh_services:

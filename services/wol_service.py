@@ -9,9 +9,13 @@ logger = logging.getLogger(__name__)
 class WOLService:
     """Wake-on-LAN 서비스"""
     
-    def __init__(self, mac_address: str = None):
-        self.mac_address = mac_address
-        self.broadcast_ip = "255.255.255.255"
+    def __init__(self, pc_config):
+        from config import PCConfig
+        if pc_config is None:
+            raise ValueError("pc_config is required")
+        self.mac_address = pc_config.mac_address
+        self.target_ip_address = pc_config.ip_address
+        self.broadcast_ip = self._calculate_broadcast_ip(self.target_ip_address)
         self.port = 9
     
     async def send_magic_packet(self, mac_address: Optional[str] = None) -> Tuple[bool, str]:
@@ -52,14 +56,24 @@ class WOLService:
             logger.error(f"WOL 패킷 전송 실패: {e}")
             return False, f"WOL 패킷 전송 실패: {str(e)}"
     
+    def _calculate_broadcast_ip(self, ip_address: str) -> str:
+        """IP 주소로부터 /24 서브넷의 브로드캐스트 IP를 계산"""
+        parts = ip_address.split('.')
+        if len(parts) == 4:
+            return f"{parts[0]}.{parts[1]}.{parts[2]}.255"
+        return "255.255.255.255" # 유효하지 않은 IP면 기본 브로드캐스트 사용
+
     async def _send_packet_async(self, magic_packet: bytes) -> None:
         """비동기로 매직 패킷 전송"""
         loop = asyncio.get_event_loop()
         
         def send_packet():
+            logger.debug(f"WOL: Creating UDP socket for {self.broadcast_ip}:{self.port}")
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                logger.debug(f"WOL: Sending {len(magic_packet)} bytes to {self.broadcast_ip}:{self.port}")
                 sock.sendto(magic_packet, (self.broadcast_ip, self.port))
+                logger.debug("WOL: Packet sent successfully")
         
         # 블로킹 작업을 스레드풀에서 실행
         await loop.run_in_executor(None, send_packet)
@@ -89,5 +103,3 @@ class WOLService:
         
         return False, f"WOL 전송 실패 (최대 재시도 {max_retries}회 초과)"
 
-# 전역 WOL 서비스 인스턴스
-wol_service = WOLService()
