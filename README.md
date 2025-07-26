@@ -1,5 +1,4 @@
-[![Lint Status](https://github.com/hololee/booter/actions/workflows/ci.yml/badge.svg?branch=main&event=push&job=lint)](https://github.com/hololee/booter/actions/workflows/ci.yml)
-[![Test Status](https://github.com/hololee/booter/actions/workflows/ci.yml/badge.svg?branch=main&event=push&job=test)](https://github.com/hololee/booter/actions/workflows/ci.yml)
+[![CI Status](https://github.com/hololee/booter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hololee/booter/actions/workflows/ci.yml)
 
 # Booter
 
