@@ -2,6 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   lint:
@@ -14,14 +17,25 @@ jobs:
         python-version: '3.x'
     - name: Install uv
       run: pip install uv
-    - name: Install linting dependencies with uv
+    - name: Install dependencies with uv
       run: uv sync
+
     - name: Run Black
-      run: uv run black --check .
+      uses: psf/black@stable
+      with:
+        options: "--check --diff"
+        src: "."
+
     - name: Run Flake8
-      run: uv run flake8 .
+      uses: py-actions/flake8@v2
+      with:
+        path: "."
+
     - name: Run Isort
-      run: uv run isort --check-only .
+      uses: isort/isort-action@v3
+      with:
+        requirements: "uv.lock"
+        args: "--check-only --diff"
 
   test:
     runs-on: ubuntu-latest
