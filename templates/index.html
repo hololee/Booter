@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booter</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" href="/static/resources/favicon_light.svg" type="image/svg+xml" media="(prefers-color-scheme: light)">
+    <link rel="icon" href="/static/resources/favicon_dark.svg" type="image/svg+xml" media="(prefers-color-scheme: dark)">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -12,21 +14,53 @@
 <body>
     <header class="header">
         <div class="header-content">
-            <h1 class="title">Booter</h1>
+            <div class="header-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <span class="hamburger-line"></span>
+                    <span class="hamburger-line"></span>
+                    <span class="hamburger-line"></span>
+                </button>
+                <h1 class="title">
+                    <img src="/static/resources/logo.svg" alt="Booter" class="logo">
+                </h1>
+            </div>
             <div class="header-actions">
                 <button class="btn btn-primary" id="addPcBtn">PC 추가</button>
-                <button class="btn btn-secondary" id="refreshAllBtn">전체 새로고침</button>
+                <button class="btn btn-secondary" id="refreshAllBtn">새로고침</button>
             </div>
         </div>
     </header>
 
-    <div class="container">
-        <main class="main-content">
-            <!-- PC 목록 -->
-            <div class="pc-grid" id="pcGrid">
-                <!-- PC 카드들이 동적으로 추가됨 -->
-            </div>
-        </main>
+    <!-- 사이드바 메뉴 -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-content">
+            <ul class="menu-list">
+                <li class="menu-item active" data-menu="pc">
+                    <button class="menu-button">
+                        <span class="menu-text">PC</span>
+                    </button>
+                </li>
+                <li class="menu-item" data-menu="vm">
+                    <button class="menu-button">
+                        <span class="menu-text">VM</span>
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 모바일 오버레이 -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <div class="app-container">
+        <div class="container">
+            <main class="main-content">
+                <!-- PC 목록 -->
+                <div class="pc-grid" id="pcGrid">
+                    <!-- PC 카드들이 동적으로 추가됨 -->
+                </div>
+            </main>
+        </div>
     </div>
 
     
@@ -36,7 +70,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalTitle">PC 추가</h3>
-                <button class="close-btn" id="closeModalBtn">×</button>
             </div>
             <div class="modal-body">
                 <form id="pcForm">
@@ -70,7 +103,7 @@
                         <div class="password-input-container">
                             <input type="password" id="sshPassword" name="ssh_password" required>
                             <button type="button" class="password-toggle-btn" id="sshPasswordToggle">
-                                <span class="eye-icon">👁</span>
+                                <img src="/static/resources/show.svg" alt="Show Password" class="eye-icon" id="passwordToggleIcon">
                             </button>
                         </div>
                         <small>sudo 명령 실행용 비밀번호 (항상 필수)</small>
@@ -95,14 +128,7 @@
                         <input type="text" id="bootCommand" name="boot_command" placeholder="sudo grub-reboot {N_menu} && sudo reboot">
                         <small>윈도우 부팅을 위한 실제 명령어 (alias 사용 불가)</small>
                     </div>
-                    <div class="form-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="isActive" name="is_active" checked>
-                            <span class="checkmark"></span>
-                            활성화
-                        </label>
-                    </div>
-                </form>
+                    </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" id="cancelBtn">취소</button>
@@ -116,7 +142,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>PC 삭제</h3>
-                <button class="close-btn" id="closeDeleteModalBtn">×</button>
             </div>
             <div class="modal-body">
                 <p>정말로 이 PC를 삭제하시겠습니까?</p>
@@ -135,7 +160,6 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>변경사항 취소</h3>
-                <button class="close-btn" id="closeCancelModalBtn">×</button>
             </div>
             <div class="modal-body">
                 <p>입력하신 내용이 저장되지 않습니다.</p>
@@ -151,17 +175,7 @@
     <!-- 알림 컨테이너 -->
     <div class="notification-container" id="notificationContainer"></div>
 
-    <script src="{{ url_for('static', path='/js/main.js') }}"></script>
+    <script src="/static/js/main.js"></script>
 </body>
 </html>
 
-<style>
-/* 추가적인 스타일 */
-.pc-card-actions .btn-small {
-    display: none; /* 기본적으로 숨김 */
-}
-
-.pc-card:hover .pc-card-actions .btn-small {
-    display: inline-block; /* 호버 시 보임 */
-}
-</style>

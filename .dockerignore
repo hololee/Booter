@@ -1,0 +1,90 @@
+# Python 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 가상환경
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.uv
+
+# IDE 파일
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker 파일
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# 로그 파일
+*.log
+logs/
+
+# 임시 파일
+*.tmp
+*.temp
+
+# 테스트 파일
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# 설정 파일 (보안상 제외)
+.env.local
+.env.production
+ssh_keys/
+*.pem
+*.key
+
+# 데이터 파일 (런타임에 생성)
+data/
+pc_data.json
+
+# 문서
+README.md
+LICENSE
+docs/

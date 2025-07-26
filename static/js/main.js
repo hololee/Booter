@@ -13,13 +13,29 @@ class MultiPCController {
         this.loadBootingStatusFromStorage();
         this.currentEditingPcId = null;
         
+        // 현재 선택된 메뉴 타입 (pc 또는 vm)
+        this.currentMenuType = 'pc';
+        
         this.initializeElements();
         this.attachEventListeners();
         this.connectWebSocket();
+        
+        // 초기 상태 설정 (PC 메뉴가 기본 선택)
+        this.showAddButton();
         this.loadPCs();
     }
     
     initializeElements() {
+        // 메뉴 관련 요소들
+        this.menuToggle = document.getElementById('menuToggle');
+        this.sidebar = document.getElementById('sidebar');
+        this.mobileOverlay = document.getElementById('mobileOverlay');
+        this.container = document.querySelector('.container');
+        
+        // 메뉴 항목들
+        this.menuItems = document.querySelectorAll('.menu-item');
+        
+        
         // 헤더 버튼들
         this.addPcBtn = document.getElementById('addPcBtn');
         this.refreshAllBtn = document.getElementById('refreshAllBtn');
@@ -32,20 +48,17 @@ class MultiPCController {
         this.pcModal = document.getElementById('pcModal');
         this.pcForm = document.getElementById('pcForm');
         this.modalTitle = document.getElementById('modalTitle');
-        this.closeModalBtn = document.getElementById('closeModalBtn');
         this.cancelBtn = document.getElementById('cancelBtn');
         this.saveBtn = document.getElementById('saveBtn');
         
         // 삭제 모달
         this.deleteModal = document.getElementById('deleteModal');
         this.deletePcName = document.getElementById('deletePcName');
-        this.closeDeleteModalBtn = document.getElementById('closeDeleteModalBtn');
         this.cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
         this.confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
         
         // 취소 확인 모달
         this.cancelModal = document.getElementById('cancelModal');
-        this.closeCancelModalBtn = document.getElementById('closeCancelModalBtn');
         this.keepEditingBtn = document.getElementById('keepEditingBtn');
         this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
         
@@ -56,22 +69,33 @@ class MultiPCController {
     }
     
     attachEventListeners() {
+        // 메뉴 토글 이벤트
+        if (this.menuToggle) {
+            this.menuToggle.addEventListener('click', () => this.toggleSidebar());
+        }
+        
+        if (this.mobileOverlay) {
+            this.mobileOverlay.addEventListener('click', () => this.closeSidebar());
+        }
+        
+        // 메뉴 항목 클릭 이벤트
+        this.menuItems.forEach(item => {
+            item.addEventListener('click', () => this.selectMenuItem(item));
+        });
+        
         // 헤더 버튼 이벤트
         this.addPcBtn.addEventListener('click', () => this.openAddPcModal());
         this.refreshAllBtn.addEventListener('click', () => this.refreshAllPCs());
         
         // 모달 이벤트
-        this.closeModalBtn.addEventListener('click', () => this.showCancelConfirmation());
         this.cancelBtn.addEventListener('click', () => this.showCancelConfirmation());
         this.pcForm.addEventListener('submit', (e) => this.handlePcSubmit(e));
         
         // 삭제 모달 이벤트
-        this.closeDeleteModalBtn.addEventListener('click', () => this.closeDeleteModal());
         this.cancelDeleteBtn.addEventListener('click', () => this.closeDeleteModal());
         this.confirmDeleteBtn.addEventListener('click', () => this.confirmDeletePc());
         
         // 취소 확인 모달 이벤트
-        this.closeCancelModalBtn.addEventListener('click', () => this.closeCancelModal());
         this.keepEditingBtn.addEventListener('click', () => this.closeCancelModal());
         this.confirmCancelBtn.addEventListener('click', () => this.confirmCancel());
         
@@ -87,6 +111,9 @@ class MultiPCController {
         this.cancelModal.addEventListener('click', (e) => {
             if (e.target === this.cancelModal) this.closeCancelModal();
         });
+        
+        // 윈도우 리사이즈 이벤트
+        window.addEventListener('resize', () => this.handleResize());
         
         // 페이지 가시성 변경 시 WebSocket 재연결
         document.addEventListener('visibilitychange', () => {
@@ -181,6 +208,12 @@ class MultiPCController {
         }
     }
     
+    async loadVMs() {
+        // VM 기능은 현재 개발 예정입니다.
+        // 이 함수는 현재 아무런 동작도 하지 않습니다.
+        this.renderEmptyVMState();
+    }
+    
     renderPCGrid() {
         if (this.pcs.size === 0) {
             this.pcGrid.innerHTML = `
@@ -214,6 +247,16 @@ class MultiPCController {
         });
     }
     
+    renderEmptyVMState() {
+        this.pcGrid.innerHTML = `
+            <div class="empty-state">
+                <h3>등록된 VM이 없습니다</h3>
+                <p>VM 기능은 현재 준비 중입니다</p>
+                <p>향후 업데이트를 통해 제공될 예정입니다</p>
+            </div>
+        `;
+    }
+    
     createPCCard(pc) {
         const card = document.createElement('div');
         card.className = 'pc-card';
@@ -226,8 +269,12 @@ class MultiPCController {
                     <span class="pc-name" ${pc.description ? `title="${pc.description}"` : ''}>${pc.name}</span>
                 </div>
                 <div class="pc-card-actions">
-                    <button class="btn btn-small btn-secondary" onclick="app.openEditPcModal('${pc.id}')">편집</button>
-                    <button class="btn btn-small btn-danger" onclick="app.openDeleteModal('${pc.id}')">삭제</button>
+                    <button class="icon-btn edit-btn" onclick="app.openEditPcModal('${pc.id}')" title="편집">
+                        <img src="/static/resources/edit.svg" alt="편집" class="action-icon">
+                    </button>
+                    <button class="icon-btn delete-btn" onclick="app.openDeleteModal('${pc.id}')" title="삭제">
+                        <img src="/static/resources/trash.svg" alt="삭제" class="action-icon">
+                    </button>
                 </div>
             </div>
             <div class="pc-card-body">
@@ -251,10 +298,10 @@ class MultiPCController {
                 </div>
                 <div class="pc-boot-buttons">
                     <button class="boot-btn ubuntu-btn" id="ubuntu-btn-${pc.id}" onclick="app.bootUbuntu('${pc.id}')">
-                        Ubuntu 부팅
+                        Ubuntu
                     </button>
                     <button class="boot-btn windows-btn" id="windows-btn-${pc.id}" onclick="app.bootWindows('${pc.id}')">
-                        Windows 부팅
+                        Windows
                     </button>
                 </div>
             </div>
@@ -362,7 +409,6 @@ class MultiPCController {
         document.getElementById('rdpPort').value = pc.rdp_port;
         document.getElementById('bootCommand').value = pc.boot_command;
         document.getElementById('description').value = pc.description || '';
-        document.getElementById('isActive').checked = pc.is_active;
         
         // SSH 설정
         document.getElementById('sshPassword').value = pc.ssh_password || '';
@@ -436,8 +482,7 @@ class MultiPCController {
             ssh_port: parseInt(formData.get('ssh_port')),
             rdp_port: parseInt(formData.get('rdp_port')),
             boot_command: formData.get('boot_command'),
-            description: formData.get('description'),
-            is_active: formData.get('is_active') === 'on'
+            description: formData.get('description')
         };
         
         // SSH 비밀번호는 항상 필수
@@ -601,7 +646,7 @@ class MultiPCController {
             this.showNotification('상태 새로고침 실패', 'error');
         } finally {
             this.refreshAllBtn.disabled = false;
-            this.refreshAllBtn.innerHTML = '전체 새로고침';
+            this.refreshAllBtn.innerHTML = '새로고침';
         }
     }
     
@@ -806,15 +851,16 @@ class MultiPCController {
     
     togglePasswordVisibility() {
         const passwordInput = document.getElementById('sshPassword');
-        const toggleBtn = document.getElementById('sshPasswordToggle');
-        const eyeIcon = toggleBtn.querySelector('.eye-icon');
+        const passwordToggleIcon = document.getElementById('passwordToggleIcon');
         
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
-            eyeIcon.textContent = '👁‍🗨'; // 닫힌 눈 아이콘
+            passwordToggleIcon.src = '/static/resources/hide.svg';
+            passwordToggleIcon.alt = 'Hide Password';
         } else {
             passwordInput.type = 'password';
-            eyeIcon.textContent = '👁'; // 열린 눈 아이콘
+            passwordToggleIcon.src = '/static/resources/show.svg';
+            passwordToggleIcon.alt = 'Show Password';
         }
     }
     
@@ -832,6 +878,95 @@ class MultiPCController {
     confirmCancel() {
         this.closeCancelModal();
         this.closePcModal();
+    }
+    
+    // 메뉴 관련 메서드들
+    toggleSidebar() {
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // 모바일에서는 오버레이와 함께 사이드바 토글
+            this.sidebar.classList.toggle('show');
+            this.mobileOverlay.classList.toggle('show');
+        } else {
+            // 데스크톱에서는 사이드바와 컨테이너 토글
+            this.sidebar.classList.toggle('show');
+            this.container.classList.toggle('sidebar-open');
+        }
+        
+        // 햄버거 메뉴 애니메이션
+        this.menuToggle.classList.toggle('active');
+    }
+    
+    closeSidebar() {
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            this.sidebar.classList.remove('show');
+            this.mobileOverlay.classList.remove('show');
+        } else {
+            this.sidebar.classList.remove('show');
+            this.container.classList.remove('sidebar-open');
+        }
+        
+        this.menuToggle.classList.remove('active');
+    }
+    
+    selectMenuItem(selectedItem) {
+        // 모든 메뉴 항목에서 active 클래스 제거
+        this.menuItems.forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // 선택된 항목에 active 클래스 추가
+        selectedItem.classList.add('active');
+        
+        // 메뉴 타입에 따른 처리
+        const menuType = selectedItem.dataset.menu;
+        this.currentMenuType = menuType;
+        
+        if (menuType === 'pc') {
+            // PC 메뉴 선택 시 PC 목록 표시 및 추가 버튼 보이기
+            this.showAddButton();
+            this.loadPCs();
+        } else if (menuType === 'vm') {
+            // VM 메뉴 선택 시 VM 목록 표시 및 추가 버튼 숨기기
+            this.hideAddButton();
+            this.loadVMs();
+        }
+        
+        // 모바일에서는 메뉴 선택 후 사이드바 닫기
+        if (window.innerWidth <= 768) {
+            this.closeSidebar();
+        }
+    }
+    
+    showAddButton() {
+        if (this.addPcBtn) {
+            this.addPcBtn.style.display = 'block';
+        }
+    }
+    
+    hideAddButton() {
+        if (this.addPcBtn) {
+            this.addPcBtn.style.display = 'none';
+        }
+    }
+    
+    // 창 크기 변경 시 사이드바 상태 조정
+    handleResize() {
+        const isMobile = window.innerWidth <= 768;
+        
+        if (isMobile) {
+            // 모바일로 전환 시 사이드바와 컨테이너 상태 초기화
+            this.sidebar.classList.remove('show');
+            this.mobileOverlay.classList.remove('show');
+            this.menuToggle.classList.remove('active');
+            this.container.classList.remove('sidebar-open');
+        } else {
+            // 데스크톱으로 전환 시 오버레이 제거
+            this.mobileOverlay.classList.remove('show');
+        }
     }
 }
 
