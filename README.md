@@ -1,3 +1,6 @@
+[![Lint Status](https://github.com/hololee/booter/actions/workflows/ci.yml/badge.svg?branch=main&event=push&job=lint)](https://github.com/hololee/booter/actions/workflows/ci.yml)
+[![Test Status](https://github.com/hololee/booter/actions/workflows/ci.yml/badge.svg?branch=main&event=push&job=test)](https://github.com/hololee/booter/actions/workflows/ci.yml)
+
 # Booter
 
 FastAPI-based web service for controlling multiple dual-boot PCs remotely using Wake-on-LAN.
