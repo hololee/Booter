@@ -3,6 +3,8 @@
 
 # Booter
 
+**⚠️ 이 프로젝트는 아직 실험 단계에 있습니다. 보안에 각별히 주의해주세요. ⚠️**
+
 FastAPI-based web service for controlling multiple dual-boot PCs remotely using Wake-on-LAN.
 
 ![타이틀](./imgs/title.png)
