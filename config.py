@@ -6,6 +6,16 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class SSHConfig(BaseModel):
+    """SSH 설정 정보"""
+
+    user: str = Field(..., description="SSH 사용자명")
+    key_text: Optional[str] = Field(None, description="SSH 개인키 텍스트")
+    key_path: Optional[str] = Field(None, description="SSH 키 파일 경로")
+    password: str = Field(..., description="SSH 비밀번호 (빈 문자열 허용)")
+    port: int = Field(default=22, description="SSH 포트")
+
+
 class PCConfig(BaseModel):
     """PC 설정 정보"""
 
@@ -13,15 +23,54 @@ class PCConfig(BaseModel):
     name: str = Field(..., description="PC 이름")
     mac_address: str = Field(..., description="MAC 주소", pattern=r"^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")
     ip_address: str = Field(..., description="IP 주소")
-    ssh_user: str = Field(..., description="SSH 사용자명")
-    ssh_auth_method: str = Field(default="key", description="SSH 인증 방법 (key/password)")
-    ssh_key_text: Optional[str] = Field(None, description="SSH 개인키 텍스트")
-    ssh_key_path: Optional[str] = Field(None, description="SSH 키 파일 경로")
-    ssh_password: Optional[str] = Field(None, description="SSH 비밀번호 (sudo 명령 실행 시에도 사용)")
-    ssh_port: int = Field(default=22, description="SSH 포트")
-    rdp_port: int = Field(default=3389, description="RDP 포트")
+
+    # Ubuntu SSH 설정
+    ubuntu_ssh: SSHConfig = Field(..., description="Ubuntu SSH 설정")
+
+    # Windows SSH 설정 (필수)
+    windows_ssh: SSHConfig = Field(..., description="Windows SSH 설정")
+
     boot_command: str = Field(default="grub-reboot Windows && reboot", description="Windows 부팅 명령")
     description: Optional[str] = Field(None, description="PC 설명")
+
+    # 하위 호환성을 위한 deprecated 필드들
+    ssh_user: Optional[str] = Field(None, description="[Deprecated] SSH 사용자명")
+    ssh_auth_method: Optional[str] = Field(None, description="[Deprecated] SSH 인증 방법")
+    ssh_key_text: Optional[str] = Field(None, description="[Deprecated] SSH 개인키 텍스트")
+    ssh_key_path: Optional[str] = Field(None, description="[Deprecated] SSH 키 파일 경로")
+    ssh_password: Optional[str] = Field(None, description="[Deprecated] SSH 비밀번호")
+    ssh_port: Optional[int] = Field(None, description="[Deprecated] SSH 포트")
+    rdp_port: Optional[int] = Field(None, description="[Deprecated] RDP 포트")
+
+    def is_deprecated_format(self) -> bool:
+        """기존 포맷 사용 여부 확인"""
+        return any(
+            [
+                self.ssh_user is not None,
+                self.ssh_auth_method is not None,
+                self.ssh_key_text is not None,
+                self.ssh_key_path is not None,
+                self.ssh_password is not None,
+                self.ssh_port is not None,
+                self.rdp_port is not None,
+            ]
+        )
+
+    def get_ubuntu_ssh(self) -> SSHConfig:
+        """Ubuntu SSH 설정 반환 (하위 호환성 포함)"""
+        if self.is_deprecated_format():
+            return SSHConfig(
+                user=self.ssh_user or "ubuntu",
+                key_text=self.ssh_key_text,
+                key_path=self.ssh_key_path,
+                password=self.ssh_password or "",
+                port=self.ssh_port or 22,
+            )
+        return self.ubuntu_ssh
+
+    def get_windows_ssh(self) -> SSHConfig:
+        """Windows SSH 설정 반환"""
+        return self.windows_ssh
 
     class Config:
         json_schema_extra = {
@@ -30,11 +79,9 @@ class PCConfig(BaseModel):
                 "name": "Gaming PC",
                 "mac_address": "AA:BB:CC:DD:EE:FF",
                 "ip_address": "192.168.1.100",
-                "ssh_user": "ubuntu",
-                "ssh_key_path": "~/.ssh/id_rsa",
-                "ssh_port": 22,
-                "rdp_port": 3389,
-                "boot_command": "bootWin",
+                "ubuntu_ssh": {"user": "ubuntu", "key_path": "~/.ssh/id_rsa", "password": "", "port": 22},
+                "windows_ssh": {"user": "administrator", "password": "password123", "port": 22},
+                "boot_command": "grub-reboot Windows && reboot",
                 "description": "게임용 듀얼부팅 PC",
             }
         }

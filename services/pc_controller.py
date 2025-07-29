@@ -74,9 +74,10 @@ class PCController:
         if pc_id not in self.wol_services:
             self.wol_services[pc_id] = WOLService(pc_config)
 
-        # SSH 서비스
+        # SSH 서비스 (Ubuntu SSH 설정 사용)
         if pc_id not in self.ssh_services:
-            self.ssh_services[pc_id] = SSHService(pc_config)
+            ubuntu_ssh = pc_config.get_ubuntu_ssh()
+            self.ssh_services[pc_id] = SSHService(ubuntu_ssh, pc_config.ip_address, pc_config.boot_command)
 
         # 포트 스캐너
         if pc_id not in self.port_scanners:
@@ -99,19 +100,19 @@ class PCController:
         try:
             wol_service, ssh_service, port_scanner = self._get_or_create_services(pc_id)
 
-            # 병렬로 SSH와 RDP 연결 확인
-            ssh_available = await ssh_service.is_ubuntu_booted()
-            rdp_available = await port_scanner.is_windows_booted()
+            # 병렬로 Ubuntu SSH와 Windows SSH 연결 확인
+            ubuntu_available, ubuntu_msg = await port_scanner.check_ubuntu_status()
+            windows_available, windows_msg = await port_scanner.check_windows_status()
 
             # 상태 결정
             old_state = self.pc_states.get(pc_id, PCState.UNKNOWN)
 
-            if ssh_available and rdp_available:
+            if ubuntu_available and windows_available:
                 # 드물지만 둘 다 열려있는 경우 (전환 중일 가능성)
                 new_state = PCState.UNKNOWN
-            elif ssh_available:
+            elif ubuntu_available:
                 new_state = PCState.UBUNTU
-            elif rdp_available:
+            elif windows_available:
                 new_state = PCState.WINDOWS
             else:
                 new_state = PCState.OFF
@@ -128,10 +129,15 @@ class PCController:
                 "pc_id": pc_id,
                 "pc_name": pc_config.name if pc_config else "Unknown",
                 "state": new_state.value,
-                "ssh_available": ssh_available,
-                "rdp_available": rdp_available,
+                "ubuntu_available": ubuntu_available,
+                "windows_available": windows_available,
+                "ubuntu_message": ubuntu_msg,
+                "windows_message": windows_msg,
                 "timestamp": datetime.now().isoformat(),
                 "active_tasks": len(active_tasks),
+                # 하위 호환성을 위한 필드들
+                "ssh_available": ubuntu_available,
+                "rdp_available": windows_available,
             }
 
         except Exception as e:
@@ -140,10 +146,15 @@ class PCController:
                 "pc_id": pc_id,
                 "pc_name": "Unknown",
                 "state": PCState.UNKNOWN.value,
-                "ssh_available": False,
-                "rdp_available": False,
+                "ubuntu_available": False,
+                "windows_available": False,
+                "ubuntu_message": "상태 확인 오류",
+                "windows_message": "상태 확인 오류",
                 "timestamp": datetime.now().isoformat(),
                 "error": str(e),
+                # 하위 호환성을 위한 필드들
+                "ssh_available": False,
+                "rdp_available": False,
             }
 
     async def get_all_pc_status(self) -> dict:
@@ -346,7 +357,10 @@ class PCController:
         start_time = asyncio.get_event_loop().time()
 
         while (asyncio.get_event_loop().time() - start_time) < timeout:
-            if await ssh_service.is_ubuntu_booted():
+            # ssh_service.is_ubuntu_booted() 대신 port_scanner 사용
+            wol_service, ssh_service, port_scanner = self._get_or_create_services(task.pc_id)
+            ubuntu_available, _ = await port_scanner.check_ubuntu_status()
+            if ubuntu_available:
                 return True
 
             await asyncio.sleep(self.status_check_interval)
@@ -359,7 +373,8 @@ class PCController:
         start_time = asyncio.get_event_loop().time()
 
         while (asyncio.get_event_loop().time() - start_time) < timeout:
-            if await port_scanner.is_windows_booted():
+            windows_available, _ = await port_scanner.check_windows_status()
+            if windows_available:
                 return True
 
             await asyncio.sleep(self.status_check_interval)

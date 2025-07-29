@@ -6,7 +6,7 @@ from typing import Tuple
 import paramiko
 from paramiko.ssh_exception import NoValidConnectionsError
 
-from config import config
+from config import SSHConfig, config
 
 logger = logging.getLogger(__name__)
 
@@ -14,18 +14,19 @@ logger = logging.getLogger(__name__)
 class SSHService:
     """SSH 연결 및 원격 명령 실행 서비스"""
 
-    def __init__(self, pc_config):
+    def __init__(self, ssh_config: SSHConfig, host: str, boot_command: str = None):
+        if ssh_config is None:
+            raise ValueError("ssh_config is required")
+        if not host:
+            raise ValueError("host is required")
 
-        if pc_config is None:
-            raise ValueError("pc_config is required")
-        self.host = pc_config.ip_address
-        self.username = pc_config.ssh_user
-        self.auth_method = pc_config.ssh_auth_method
-        self.key_path = Path(pc_config.ssh_key_path).expanduser() if pc_config.ssh_key_path else None
-        self.key_text = pc_config.ssh_key_text
-        self.password = pc_config.ssh_password
-        self.port = pc_config.ssh_port
-        self.boot_command = pc_config.boot_command
+        self.host = host
+        self.username = ssh_config.user
+        self.key_path = Path(ssh_config.key_path).expanduser() if ssh_config.key_path else None
+        self.key_text = ssh_config.key_text
+        self.password = ssh_config.password
+        self.port = ssh_config.port
+        self.boot_command = boot_command or "grub-reboot Windows && reboot"
         self.timeout = config.SSH_TIMEOUT
 
     async def test_connection(self) -> Tuple[bool, str]:
@@ -147,23 +148,28 @@ class SSHService:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
-            # SSH 연결 (인증 방법에 따라 분기)
-            if self.auth_method == "key":
-                private_key = self._load_private_key()
-                if not private_key:
-                    return False, "", "SSH 키 로드 실패"
+            # SSH 연결 (키가 있으면 키로 먼저 시도, 실패하면 비밀번호로 시도)
+            connected = False
 
-                ssh.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    pkey=private_key,
-                    timeout=self.timeout,
-                )
-            else:  # password
-                if not self.password:
-                    return False, "", "SSH 비밀번호가 설정되지 않았습니다"
+            # 1. 키 인증 시도
+            if self.key_text or self.key_path:
+                try:
+                    private_key = self._load_private_key()
+                    if private_key:
+                        ssh.connect(
+                            hostname=self.host,
+                            port=self.port,
+                            username=self.username,
+                            pkey=private_key,
+                            timeout=self.timeout,
+                        )
+                        connected = True
+                        logger.debug(f"SSH 키 인증 성공: {self.host}")
+                except Exception as e:
+                    logger.debug(f"SSH 키 인증 실패: {e}")
 
+            # 2. 키 인증이 실패했거나 키가 없으면 비밀번호로 시도
+            if not connected:
                 ssh.connect(
                     hostname=self.host,
                     port=self.port,
@@ -171,6 +177,7 @@ class SSHService:
                     password=self.password,
                     timeout=self.timeout,
                 )
+                logger.debug(f"SSH 비밀번호 인증 성공: {self.host}")
 
             # 명령 실행
             stdin, stdout, stderr = ssh.exec_command(command)
@@ -344,23 +351,28 @@ class SSHService:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
-            # SSH 연결 (인증 방법에 따라 분기)
-            if self.auth_method == "key":
-                private_key = self._load_private_key()
-                if not private_key:
-                    return False, "", "SSH 키 로드 실패"
+            # SSH 연결 (키가 있으면 키로 먼저 시도, 실패하면 비밀번호로 시도)
+            connected = False
 
-                ssh.connect(
-                    hostname=self.host,
-                    port=self.port,
-                    username=self.username,
-                    pkey=private_key,
-                    timeout=self.timeout,
-                )
-            else:  # password
-                if not self.password:
-                    return False, "", "SSH 비밀번호가 설정되지 않았습니다"
+            # 1. 키 인증 시도
+            if self.key_text or self.key_path:
+                try:
+                    private_key = self._load_private_key()
+                    if private_key:
+                        ssh.connect(
+                            hostname=self.host,
+                            port=self.port,
+                            username=self.username,
+                            pkey=private_key,
+                            timeout=self.timeout,
+                        )
+                        connected = True
+                        logger.debug(f"SSH 키 인증 성공: {self.host}")
+                except Exception as e:
+                    logger.debug(f"SSH 키 인증 실패: {e}")
 
+            # 2. 키 인증이 실패했거나 키가 없으면 비밀번호로 시도
+            if not connected:
                 ssh.connect(
                     hostname=self.host,
                     port=self.port,
@@ -368,6 +380,7 @@ class SSHService:
                     password=self.password,
                     timeout=self.timeout,
                 )
+                logger.debug(f"SSH 비밀번호 인증 성공: {self.host}")
 
             # 인터랙티브 bash 세션에서 명령 실행
             # -l 옵션으로 로그인 셸을 사용하여 .bashrc를 자동으로 로드

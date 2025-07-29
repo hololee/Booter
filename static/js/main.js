@@ -100,8 +100,8 @@ class MultiPCController {
         this.confirmCancelBtn.addEventListener('click', () => this.confirmCancel());
         
         
-        // SSH 비밀번호 토글 이벤트
-        document.getElementById('sshPasswordToggle').addEventListener('click', () => this.togglePasswordVisibility());
+        // SSH 관련 이벤트 리스너들
+        this.initializeSSHEventListeners();
         
         // 모달 배경 클릭 시 닫기 비활성화 (PC 모달만)
         this.deleteModal.addEventListener('click', (e) => {
@@ -259,7 +259,8 @@ class MultiPCController {
     
     createPCCard(pc) {
         const card = document.createElement('div');
-        card.className = 'pc-card';
+        const isDeprecated = pc.ssh_user || pc.ssh_password || pc.ssh_key_text || pc.rdp_port;
+        card.className = `pc-card${isDeprecated ? ' deprecated' : ''}`;
         card.id = `pc-${pc.id}`;
         
         card.innerHTML = `
@@ -389,6 +390,13 @@ class MultiPCController {
         this.currentEditingPcId = null;
         this.modalTitle.textContent = 'PC 추가';
         this.pcForm.reset();
+        
+        // 기본값 설정
+        document.getElementById('ubuntuSshUser').value = 'ubuntu';
+        document.getElementById('ubuntuSshPort').value = '22';
+        document.getElementById('windowsSshUser').value = 'administrator';
+        document.getElementById('windowsSshPort').value = '22';
+        
         this.pcModal.classList.add('show');
     }
     
@@ -400,19 +408,46 @@ class MultiPCController {
         this.currentEditingPcId = pcId;
         this.modalTitle.textContent = 'PC 편집';
         
-        // 폼에 데이터 채우기
+        // 기본 정보 채우기
         document.getElementById('pcName').value = pc.name;
         document.getElementById('macAddress').value = pc.mac_address;
         document.getElementById('ipAddress').value = pc.ip_address;
-        document.getElementById('sshUser').value = pc.ssh_user;
-        document.getElementById('sshPort').value = pc.ssh_port;
-        document.getElementById('rdpPort').value = pc.rdp_port;
         document.getElementById('bootCommand').value = pc.boot_command;
         document.getElementById('description').value = pc.description || '';
         
-        // SSH 설정
-        document.getElementById('sshPassword').value = pc.ssh_password || '';
-        document.getElementById('sshKeyText').value = pc.ssh_key_text || '';
+        // deprecated 표시 및 알림
+        if (pc.ssh_user || pc.ssh_password || pc.ssh_key_text || pc.rdp_port) {
+            this.showDeprecatedFormatAlert();
+        }
+        
+        // Ubuntu SSH 설정
+        if (pc.ubuntu_ssh) {
+            document.getElementById('ubuntuSshUser').value = pc.ubuntu_ssh.user || 'ubuntu';
+            document.getElementById('ubuntuSshKeyText').value = pc.ubuntu_ssh.key_text || '';
+            document.getElementById('ubuntuSshPassword').value = pc.ubuntu_ssh.password || '';
+            document.getElementById('ubuntuSshPort').value = pc.ubuntu_ssh.port || 22;
+        } else {
+            // 하위 호환성을 위한 기존 필드 사용
+            document.getElementById('ubuntuSshUser').value = pc.ssh_user || 'ubuntu';
+            document.getElementById('ubuntuSshKeyText').value = pc.ssh_key_text || '';
+            document.getElementById('ubuntuSshPassword').value = pc.ssh_password || '';
+            document.getElementById('ubuntuSshPort').value = pc.ssh_port || 22;
+        }
+        
+        // Windows SSH 설정
+        if (pc.windows_ssh) {
+            document.getElementById('windowsSshUser').value = pc.windows_ssh.user || 'administrator';
+            document.getElementById('windowsSshKeyText').value = pc.windows_ssh.key_text || '';
+            document.getElementById('windowsSshPassword').value = pc.windows_ssh.password || '';
+            document.getElementById('windowsSshPort').value = pc.windows_ssh.port || 22;
+        } else {
+            // 기본값 설정
+            document.getElementById('windowsSshUser').value = 'administrator';
+            document.getElementById('windowsSshKeyText').value = '';
+            document.getElementById('windowsSshPassword').value = '';
+            document.getElementById('windowsSshPort').value = 22;
+        }
+        
         this.pcModal.classList.add('show');
     }
     
@@ -470,26 +505,34 @@ class MultiPCController {
             ? this.currentEditingPcId 
             : this.generatePcId(pcName);
         
+        // Ubuntu SSH 설정
+        const ubuntuSsh = {
+            user: formData.get('ubuntu_ssh_user') || 'ubuntu',
+            key_text: formData.get('ubuntu_ssh_key_text') || '',
+            password: formData.get('ubuntu_ssh_password') || '',
+            port: parseInt(formData.get('ubuntu_ssh_port')) || 22
+        };
+        
+        // Windows SSH 설정 (필수)
+        const windowsSsh = {
+            user: formData.get('windows_ssh_user') || 'administrator',
+            key_text: formData.get('windows_ssh_key_text') || '',
+            password: formData.get('windows_ssh_password') || '',
+            port: parseInt(formData.get('windows_ssh_port')) || 22
+        };
+        
         const pcData = {
             id: pcId,
             name: pcName,
             mac_address: formData.get('mac_address'),
             ip_address: formData.get('ip_address'),
-            ssh_user: formData.get('ssh_user'),
-            ssh_password: formData.get('ssh_password'),
-            ssh_key_text: formData.get('ssh_key_text'),
-            ssh_auth_method: formData.get('ssh_key_text') ? 'key' : 'password', // 키가 있으면 key, 없으면 password
-            ssh_port: parseInt(formData.get('ssh_port')),
-            rdp_port: parseInt(formData.get('rdp_port')),
+            ubuntu_ssh: ubuntuSsh,
+            windows_ssh: windowsSsh,
             boot_command: formData.get('boot_command'),
             description: formData.get('description')
         };
         
-        // SSH 비밀번호는 항상 필수
-        if (!pcData.ssh_password) {
-            this.showNotification('SSH 비밀번호를 입력해주세요', 'error');
-            return;
-        }
+        // 두 OS 모두 빈 비밀번호 허용
         
         console.log('Sending PC data:', pcData);
         
@@ -849,19 +892,37 @@ class MultiPCController {
         return finalId;
     }
     
-    togglePasswordVisibility() {
-        const passwordInput = document.getElementById('sshPassword');
-        const passwordToggleIcon = document.getElementById('passwordToggleIcon');
+    initializeSSHEventListeners() {
+        // 비밀번호 토글 버튼들
+        document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.togglePasswordVisibility(e));
+        });
+    }
+    
+    
+    togglePasswordVisibility(event) {
+        const btn = event.currentTarget;
+        const targetId = btn.getAttribute('data-target');
+        const passwordInput = document.getElementById(targetId);
+        const icon = btn.querySelector('.eye-icon');
         
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
-            passwordToggleIcon.src = '/static/resources/hide.svg';
-            passwordToggleIcon.alt = 'Hide Password';
+            icon.src = '/static/resources/hide.svg';
+            icon.alt = 'Hide Password';
         } else {
             passwordInput.type = 'password';
-            passwordToggleIcon.src = '/static/resources/show.svg';
-            passwordToggleIcon.alt = 'Show Password';
+            icon.src = '/static/resources/show.svg';
+            icon.alt = 'Show Password';
         }
+    }
+    
+    showDeprecatedFormatAlert() {
+        this.showNotification(
+            '이 PC는 구 버전 포맷을 사용합니다. 새로운 Ubuntu/Windows SSH 설정으로 업데이트해주세요.', 
+            'warning', 
+            10000
+        );
     }
     
     // 취소 확인 모달 표시

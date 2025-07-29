@@ -93,34 +93,64 @@
                         <input type="text" id="ipAddress" name="ip_address" required pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$" title="IP 주소는 192.168.1.100 형식이어야 합니다" placeholder="예: 192.168.1.100">
                         <small>형식: 192.168.1.100</small>
                     </div>
-                    <div class="form-group">
-                        <label for="sshUser">SSH 사용자 <span class="required">*</span></label>
-                        <input type="text" id="sshUser" name="ssh_user" required>
-                        <small>SSH 접속 사용자명</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="sshPassword">SSH 비밀번호 <span class="required">*</span></label>
-                        <div class="password-input-container">
-                            <input type="password" id="sshPassword" name="ssh_password" required>
-                            <button type="button" class="password-toggle-btn" id="sshPasswordToggle">
-                                <img src="/static/resources/show.svg" alt="Show Password" class="eye-icon" id="passwordToggleIcon">
-                            </button>
-                        </div>
-                        <small>sudo 명령 실행용 비밀번호 (항상 필수)</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="sshKeyText">SSH 개인키</label>
-                        <textarea id="sshKeyText" name="ssh_key_text" rows="6" placeholder="-----BEGIN PRIVATE KEY-----&#10;키 내용을 여기에 붙여넣기&#10;-----END PRIVATE KEY-----"></textarea>
-                        <small>SSH 개인키가 있으면 키로 접속, 없으면 비밀번호로 접속</small>
-                    </div>
-                    <div class="form-row">
+                    
+                    <!-- Ubuntu SSH 설정 -->
+                    <div class="ssh-section">
+                        <h4 class="ssh-section-title">Ubuntu SSH 설정</h4>
                         <div class="form-group">
-                            <label for="sshPort">SSH 포트 <span class="required">*</span></label>
-                            <input type="number" id="sshPort" name="ssh_port" value="22" min="1" max="65535">
+                            <label for="ubuntuSshUser">SSH 사용자 <span class="required">*</span></label>
+                            <input type="text" id="ubuntuSshUser" name="ubuntu_ssh_user" required value="ubuntu">
+                            <small>Ubuntu SSH 접속 사용자명</small>
                         </div>
                         <div class="form-group">
-                            <label for="rdpPort">RDP 포트 <span class="required">*</span></label>
-                            <input type="number" id="rdpPort" name="rdp_port" value="3389" min="1" max="65535">
+                            <label for="ubuntuSshPassword">SSH 비밀번호 <span class="required">*</span></label>
+                            <div class="password-input-container">
+                                <input type="password" id="ubuntuSshPassword" name="ubuntu_ssh_password" required>
+                                <button type="button" class="password-toggle-btn" data-target="ubuntuSshPassword">
+                                    <img src="/static/resources/show.svg" alt="Show Password" class="eye-icon">
+                                </button>
+                            </div>
+                            <small>SSH 비밀번호 (빈 비밀번호 가능)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="ubuntuSshKeyText">SSH 개인키</label>
+                            <textarea id="ubuntuSshKeyText" name="ubuntu_ssh_key_text" rows="6" placeholder="-----BEGIN PRIVATE KEY-----&#10;키 내용을 여기에 붙여넣기&#10;-----END PRIVATE KEY-----"></textarea>
+                            <small>SSH 개인키 내용 (선택사항)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="ubuntuSshPort">SSH 포트 <span class="required">*</span></label>
+                            <input type="number" id="ubuntuSshPort" name="ubuntu_ssh_port" value="22" min="1" max="65535" required>
+                        </div>
+                    </div>
+
+                    <!-- Windows SSH 설정 -->
+                    <div class="ssh-section">
+                        <h4 class="ssh-section-title">Windows SSH 설정</h4>
+                        <div id="windowsSshFields">
+                            <div class="form-group">
+                                <label for="windowsSshUser">SSH 사용자 <span class="required">*</span></label>
+                                <input type="text" id="windowsSshUser" name="windows_ssh_user" value="administrator" required>
+                                <small>Windows SSH 접속 사용자명</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="windowsSshPassword">SSH 비밀번호 <span class="required">*</span></label>
+                                <div class="password-input-container">
+                                    <input type="password" id="windowsSshPassword" name="windows_ssh_password" required>
+                                    <button type="button" class="password-toggle-btn" data-target="windowsSshPassword">
+                                        <img src="/static/resources/show.svg" alt="Show Password" class="eye-icon">
+                                    </button>
+                                </div>
+                                <small>SSH 비밀번호 (빈 비밀번호 가능)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="windowsSshKeyText">SSH 개인키</label>
+                                <textarea id="windowsSshKeyText" name="windows_ssh_key_text" rows="4" placeholder="-----BEGIN PRIVATE KEY-----&#10;키 내용을 여기에 붙여넣기&#10;-----END PRIVATE KEY-----"></textarea>
+                                <small>SSH 개인키 내용 (선택사항)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="windowsSshPort">SSH 포트 <span class="required">*</span></label>
+                                <input type="number" id="windowsSshPort" name="windows_ssh_port" value="22" min="1" max="65535" required>
+                            </div>
                         </div>
                     </div>
                     <div class="form-group">
