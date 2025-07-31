@@ -125,7 +125,6 @@ class VMManager {
             <div class="empty-state">
                 <h3>등록된 VM이 없습니다</h3>
                 <p>VM 추가 버튼을 클릭하여 첫 번째 VM을 등록하세요.</p>
-                <button class="btn btn-primary" onclick="app.vmManager.openAddVmModal()">VM 추가</button>
             </div>
         `;
     }
