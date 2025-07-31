@@ -15,6 +15,7 @@ class VMManager {
         this.vmModalTitle = null;
         this.deleteVmModal = null;
         this.deleteVmName = null;
+        this.vmNameInput = null;
         
         this.currentEditingVmId = null;
         
@@ -32,6 +33,7 @@ class VMManager {
         this.vmModalTitle = document.getElementById('vmModalTitle');
         this.vmCancelBtn = document.getElementById('vmCancelBtn');
         this.vmSaveBtn = document.getElementById('vmSaveBtn');
+        this.vmNameInput = document.getElementById('vmName');
         
         // VM 삭제 모달
         this.deleteVmModal = document.getElementById('deleteVmModal');
@@ -48,12 +50,10 @@ class VMManager {
         
         // VM 모달 이벤트
         if (this.vmCancelBtn) {
-            this.vmCancelBtn.addEventListener('click', () => this.closeVmModal());
+            this.vmCancelBtn.addEventListener('click', () => this.handleVmCancelClick());
         }
         
-        if (this.vmSaveBtn) {
-            this.vmSaveBtn.addEventListener('click', () => this.saveVM());
-        }
+        
         
         if (this.vmForm) {
             this.vmForm.addEventListener('submit', (e) => {
@@ -61,15 +61,17 @@ class VMManager {
                 this.saveVM();
             });
         }
-        
+
+        // 취소 확인 모달 이벤트 (VM용)
+        // 이 부분은 UIManager에서 처리하므로, VMManager에서는 직접 연결하지 않습니다.
+        // UIManager의 cancelModal과 confirmCancelBtn을 사용합니다.
+
         // VM 삭제 모달 이벤트
         if (this.cancelDeleteVmBtn) {
             this.cancelDeleteVmBtn.addEventListener('click', () => this.uiManager.hideModal(this.deleteVmModal));
         }
         
-        if (this.confirmDeleteVmBtn) {
-            this.confirmDeleteVmBtn.addEventListener('click', () => this.confirmDeleteVM());
-        }
+        
     }
     
     async loadVMs() {
@@ -279,8 +281,10 @@ class VMManager {
     }
     
     async refreshAllVMs() {
-        this.uiManager.showNotification('VM 상태를 새로고침하고 있습니다...', 'info');
-        
+        const refreshAllBtn = document.getElementById('refreshAllBtn');
+        const originalText = refreshAllBtn.textContent;
+        this.uiManager.showLoading(refreshAllBtn, '새로고침 중...');
+
         try {
             await this.loadVMStatuses();
             
@@ -293,6 +297,8 @@ class VMManager {
         } catch (error) {
             console.error('VM 새로고침 실패:', error);
             this.uiManager.showNotification('VM 상태 새로고침에 실패했습니다.', 'error');
+        } finally {
+            this.uiManager.hideLoading(refreshAllBtn, originalText);
         }
     }
     
@@ -303,11 +309,12 @@ class VMManager {
         this.vmForm.reset();
         
         // 기본값 설정
-        document.getElementById('vm_vm_type').value = 'qemu';
-        document.getElementById('vm_ssh_port').value = '22';
+        document.getElementById('vmType').value = 'qemu';
         
         this.uiManager.showModal(this.vmModal);
-        document.getElementById('vm_name').focus();
+        if (this.vmNameInput) {
+            this.vmNameInput.focus();
+        }
     }
     
     editVM(vmId) {
@@ -318,45 +325,66 @@ class VMManager {
         this.vmModalTitle.textContent = 'VM 편집';
         
         // 폼에 VM 정보 채우기
-        document.getElementById('vm_name').value = vm.name;
-        document.getElementById('vm_description').value = vm.description || '';
-        document.getElementById('vm_node_address').value = vm.node_address;
-        document.getElementById('vm_node_name').value = vm.node_name;
-        document.getElementById('vm_api_token').value = vm.api_token;
-        document.getElementById('vm_vm_type').value = vm.vm_type;
-        document.getElementById('vm_vm_id').value = vm.vm_id;
-        document.getElementById('vm_ssh_user').value = vm.ssh_user || '';
-        document.getElementById('vm_ssh_key_path').value = vm.ssh_key_path || '';
-        document.getElementById('vm_ssh_port').value = vm.ssh_port || 22;
+        document.getElementById('vmName').value = vm.name;
+        document.getElementById('vmDescription').value = vm.description || '';
+        document.getElementById('nodeAddress').value = vm.node_address;
+        document.getElementById('nodeName').value = vm.node_name;
+        document.getElementById('apiToken').value = vm.api_token;
+        document.getElementById('vmType').value = vm.vm_type;
+        document.getElementById('vmId').value = vm.vm_id;
         
         this.uiManager.showModal(this.vmModal);
-        document.getElementById('vm_name').focus();
+        if (this.vmNameInput) {
+            this.vmNameInput.focus();
+        }
     }
     
     closeVmModal() {
         this.uiManager.hideModal(this.vmModal);
         this.currentEditingVmId = null;
     }
-    
+
+    handleVmCancelClick() {
+        if (this.isVmFormDirty()) {
+            // UIManager의 cancelModal을 사용
+            this.uiManager.showModal(document.getElementById('cancelModal'));
+            // UIManager의 confirmCancelBtn에 VMManager의 confirmVmCancel 연결
+            document.getElementById('confirmCancelBtn').onclick = () => this.confirmVmCancel();
+            document.getElementById('keepEditingBtn').onclick = () => this.uiManager.hideModal(document.getElementById('cancelModal'));
+        } else {
+            this.closeVmModal();
+        }
+    }
+
+    confirmVmCancel() {
+        this.uiManager.hideModal(document.getElementById('cancelModal'));
+        this.closeVmModal();
+    }
+
     async saveVM() {
         if (!this.validateVMForm()) return;
         
         const formData = new FormData(this.vmForm);
         const vmData = {
-            name: formData.get('name').trim(),
-            description: formData.get('description').trim() || null,
-            node_address: formData.get('node_address').trim(),
-            node_name: formData.get('node_name').trim(),
-            api_token: formData.get('api_token').trim(),
+            name: (formData.get('name') || '').trim(),
+            description: (formData.get('description') || '').trim() || null,
+            node_address: (formData.get('node_address') || '').trim(),
+            node_name: (formData.get('node_name') || '').trim(),
+            api_token: (formData.get('api_token') || '').trim(),
             vm_type: formData.get('vm_type'),
-            vm_id: formData.get('vm_id').trim(),
-            ssh_user: formData.get('ssh_user').trim() || null,
-            ssh_key_path: formData.get('ssh_key_path').trim() || null,
+            vm_id: parseInt(formData.get('vm_id')),
+            ssh_user: (formData.get('ssh_user') || '').trim() || null,
+            ssh_key_path: (formData.get('ssh_key_path') || '').trim() || null,
             ssh_port: parseInt(formData.get('ssh_port')) || 22
         };
         
         if (this.currentEditingVmId) {
             vmData.id = this.currentEditingVmId;
+        } else {
+            vmData.id = 'vm-' + 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
         }
         
         try {
@@ -398,7 +426,45 @@ class VMManager {
         }
         return true;
     }
-    
+
+    isVmFormDirty() {
+        const formData = new FormData(this.vmForm);
+
+        if (!this.currentEditingVmId) {
+            // 새 VM 추가 시 - 하나라도 입력되어 있으면 dirty
+            for (let [key, value] of formData.entries()) {
+                if (value.trim()) {
+                    return true;
+                }
+            }
+            return false;
+        } else {
+            // VM 편집 시 - 원본과 다르면 dirty
+            const vm = this.vms.get(this.currentEditingVmId);
+            if (!vm) return false;
+
+            const currentValues = {
+                name: formData.get('name').trim(),
+                description: formData.get('description').trim(),
+                node_address: formData.get('node_address').trim(),
+                node_name: formData.get('node_name').trim(),
+                api_token: formData.get('api_token').trim(),
+                vm_type: formData.get('vm_type'),
+                vm_id: parseInt(formData.get('vm_id')),
+            };
+
+            return (
+                currentValues.name !== vm.name ||
+                currentValues.description !== (vm.description || '') ||
+                currentValues.node_address !== vm.node_address ||
+                currentValues.node_name !== vm.node_name ||
+                currentValues.api_token !== vm.api_token ||
+                currentValues.vm_type !== vm.vm_type ||
+                currentValues.vm_id !== vm.vm_id
+            );
+        }
+    }
+
     showDeleteVMConfirmation(vmId) {
         const vm = this.vms.get(vmId);
         if (!vm) return;
@@ -408,12 +474,7 @@ class VMManager {
         this.uiManager.showModal(this.deleteVmModal);
     }
     
-    confirmDeleteVM() {
-        // confirmDeleteVmBtn의 onclick에서 설정된 함수가 실행됨
-        if (this.confirmDeleteVmBtn.onclick) {
-            this.confirmDeleteVmBtn.onclick();
-        }
-    }
+    
     
     async deleteVM(vmId) {
         try {

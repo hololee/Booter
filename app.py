@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
@@ -62,17 +63,22 @@ async def get_pc(pc_id: str):
 @app.post("/api/pcs")
 async def add_pc(pc_config: PCConfig):
     """PC 추가"""
+    if not pc_config.id:
+        pc_config.id = str(uuid.uuid4())
     logger.info(f"Adding PC: {pc_config.dict()}")
 
-    # 이름 중복 확인
-    for pc in pc_manager.get_all_pcs():
-        if pc.name == pc_config.name:
-            raise HTTPException(status_code=400, detail="같은 이름의 PC가 이미 존재합니다")
-
-    if pc_manager.add_pc(pc_config):
+    success, reason = pc_manager.add_pc(pc_config)
+    if success:
         return {"status": "success", "message": "PC가 성공적으로 추가되었습니다"}
     else:
-        raise HTTPException(status_code=400, detail="PC 추가 실패 (ID 중복 또는 최대 개수 초과)")
+        if reason == "NAME_EXISTS":
+            raise HTTPException(status_code=400, detail="같은 이름의 PC가 이미 존재합니다")
+        elif reason == "ID_EXISTS":
+            raise HTTPException(status_code=400, detail="생성된 ID를 가진 PC가 이미 존재합니다. 다시 시도해주세요.")
+        elif reason == "MAX_PCS_REACHED":
+            raise HTTPException(status_code=400, detail="최대 PC 등록 개수를 초과했습니다.")
+        else:
+            raise HTTPException(status_code=400, detail="PC 추가 실패")
 
 
 @app.put("/api/pcs/{pc_id}")

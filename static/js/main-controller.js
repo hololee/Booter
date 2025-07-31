@@ -13,6 +13,7 @@ class MultiPCController {
         this.vmGrid = document.getElementById('vmGrid');
         this.addPcBtn = document.getElementById('addPcBtn');
         this.addVmBtn = document.getElementById('addVmBtn');
+        this.refreshAllBtn = document.getElementById('refreshAllBtn');
         
         // 매니저들 초기화
         this.uiManager = new UIManager();
@@ -46,6 +47,11 @@ class MultiPCController {
         this.websocketManager.onBootComplete = (data) => {
             this.handleBootComplete(data);
         };
+
+        // 새로고침 버튼 이벤트
+        if (this.refreshAllBtn) {
+            this.refreshAllBtn.addEventListener('click', () => this.refreshAll());
+        }
     }
     
     async initializeApplication() {
@@ -316,6 +322,11 @@ class MultiPCController {
     
     openDeleteModal(pcId) {
         this.pcManager.showDeletePCConfirmation(pcId);
+    }
+
+    // VM 모달 관련 전역 메서드들
+    openAddVmModal() {
+        this.vmManager.openAddVmModal();
     }
 }
 

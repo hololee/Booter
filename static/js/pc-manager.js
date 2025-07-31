@@ -17,6 +17,7 @@ class PCManager {
         this.pcModal = null;
         this.pcForm = null;
         this.modalTitle = null;
+        this.pcNameInput = null;
         this.deleteModal = null;
         this.deletePcName = null;
         this.cancelModal = null;
@@ -36,6 +37,7 @@ class PCManager {
         this.modalTitle = document.getElementById('modalTitle');
         this.cancelBtn = document.getElementById('cancelBtn');
         this.saveBtn = document.getElementById('saveBtn');
+        this.pcNameInput = document.getElementById('pcName');
         
         // 삭제 모달
         this.deleteModal = document.getElementById('deleteModal');
@@ -61,7 +63,7 @@ class PCManager {
         }
         
         if (this.saveBtn) {
-            this.saveBtn.addEventListener('click', () => this.savePC());
+            // this.saveBtn.addEventListener('click', () => this.savePC()); // 중복 호출 방지를 위해 제거
         }
         
         if (this.pcForm) {
@@ -76,9 +78,7 @@ class PCManager {
             this.cancelDeleteBtn.addEventListener('click', () => this.uiManager.hideModal(this.deleteModal));
         }
         
-        if (this.confirmDeleteBtn) {
-            this.confirmDeleteBtn.addEventListener('click', () => this.confirmDelete());
-        }
+        
         
         // 취소 확인 모달 이벤트
         if (this.keepEditingBtn) {
@@ -155,7 +155,7 @@ class PCManager {
                     <span class="pc-name" ${pc.description ? `title="${pc.description}"` : ''}>${pc.name}</span>
                 </div>
                 <div class="pc-card-actions">
-                    <button class="icon-btn edit-btn" onclick="app.openEditPcModal('${pc.id}')" title="편집">
+                    <button class="icon-btn edit-btn" onclick="app.pcManager.editPC('${pc.id}')" title="편집">
                         <img src="/static/resources/edit.svg" alt="편집" class="action-icon">
                     </button>
                     <button class="icon-btn delete-btn" onclick="app.openDeleteModal('${pc.id}')" title="삭제">
@@ -495,7 +495,9 @@ class PCManager {
         this.modalTitle.textContent = 'PC 추가';
         this.pcForm.reset();
         this.uiManager.showModal(this.pcModal);
-        document.getElementById('name').focus();
+        if (this.pcNameInput) {
+            this.pcNameInput.focus();
+        }
     }
     
     editPC(pcId) {
@@ -506,19 +508,28 @@ class PCManager {
         this.modalTitle.textContent = 'PC 편집';
         
         // 폼에 PC 정보 채우기
-        document.getElementById('name').value = pc.name;
+        document.getElementById('pcName').value = pc.name;
         document.getElementById('description').value = pc.description || '';
-        document.getElementById('mac_address').value = pc.mac_address;
-        document.getElementById('ip_address').value = pc.ip_address;
-        document.getElementById('ssh_user').value = pc.ssh_user;
-        document.getElementById('ssh_key_path').value = pc.ssh_key_path || '';
-        document.getElementById('ssh_port').value = pc.ssh_port || 22;
-        document.getElementById('rdp_port').value = pc.rdp_port || 3389;
-        document.getElementById('boot_command').value = pc.boot_command || 'bootWin';
-        document.getElementById('is_active').checked = pc.is_active !== false;
+        document.getElementById('macAddress').value = pc.mac_address;
+        document.getElementById('ipAddress').value = pc.ip_address;
+        document.getElementById('bootCommand').value = pc.boot_command || '';
+
+        // Ubuntu SSH 설정
+        document.getElementById('ubuntuSshUser').value = pc.ubuntu_ssh.user || '';
+        document.getElementById('ubuntuSshPassword').value = pc.ubuntu_ssh.password || '';
+        document.getElementById('ubuntuSshKeyText').value = pc.ubuntu_ssh.key_text || '';
+        document.getElementById('ubuntuSshPort').value = pc.ubuntu_ssh.port || 22;
+
+        // Windows SSH 설정
+        document.getElementById('windowsSshUser').value = pc.windows_ssh.user || '';
+        document.getElementById('windowsSshPassword').value = pc.windows_ssh.password || '';
+        document.getElementById('windowsSshKeyText').value = pc.windows_ssh.key_text || '';
+        document.getElementById('windowsSshPort').value = pc.windows_ssh.port || 22;
         
         this.uiManager.showModal(this.pcModal);
-        document.getElementById('name').focus();
+        if (this.pcNameInput) {
+            this.pcNameInput.focus();
+        }
     }
     
     handleCancelClick() {
@@ -550,12 +561,15 @@ class PCManager {
                 description: formData.get('description').trim(),
                 mac_address: formData.get('mac_address').trim(),
                 ip_address: formData.get('ip_address').trim(),
-                ssh_user: formData.get('ssh_user').trim(),
-                ssh_key_path: formData.get('ssh_key_path').trim(),
-                ssh_port: parseInt(formData.get('ssh_port')) || 22,
-                rdp_port: parseInt(formData.get('rdp_port')) || 3389,
                 boot_command: formData.get('boot_command').trim(),
-                is_active: formData.has('is_active')
+                ubuntu_ssh_user: formData.get('ubuntu_ssh_user').trim(),
+                ubuntu_ssh_password: formData.get('ubuntu_ssh_password').trim(),
+                ubuntu_ssh_key_text: formData.get('ubuntu_ssh_key_text').trim(),
+                ubuntu_ssh_port: parseInt(formData.get('ubuntu_ssh_port')) || 22,
+                windows_ssh_user: formData.get('windows_ssh_user').trim(),
+                windows_ssh_password: formData.get('windows_ssh_password').trim(),
+                windows_ssh_key_text: formData.get('windows_ssh_key_text').trim(),
+                windows_ssh_port: parseInt(formData.get('windows_ssh_port')) || 22,
             };
             
             return (
@@ -563,12 +577,15 @@ class PCManager {
                 currentValues.description !== (pc.description || '') ||
                 currentValues.mac_address !== pc.mac_address ||
                 currentValues.ip_address !== pc.ip_address ||
-                currentValues.ssh_user !== pc.ssh_user ||
-                currentValues.ssh_key_path !== (pc.ssh_key_path || '') ||
-                currentValues.ssh_port !== (pc.ssh_port || 22) ||
-                currentValues.rdp_port !== (pc.rdp_port || 3389) ||
-                currentValues.boot_command !== (pc.boot_command || 'bootWin') ||
-                currentValues.is_active !== (pc.is_active !== false)
+                currentValues.boot_command !== (pc.boot_command || '') ||
+                currentValues.ubuntu_ssh_user !== (pc.ubuntu_ssh.user || '') ||
+                currentValues.ubuntu_ssh_password !== (pc.ubuntu_ssh.password || '') ||
+                currentValues.ubuntu_ssh_key_text !== (pc.ubuntu_ssh.key_text || '') ||
+                currentValues.ubuntu_ssh_port !== (pc.ubuntu_ssh.port || 22) ||
+                currentValues.windows_ssh_user !== (pc.windows_ssh.user || '') ||
+                currentValues.windows_ssh_password !== (pc.windows_ssh.password || '') ||
+                currentValues.windows_ssh_key_text !== (pc.windows_ssh.key_text || '') ||
+                currentValues.windows_ssh_port !== (pc.windows_ssh.port || 22)
             );
         }
     }
@@ -583,80 +600,65 @@ class PCManager {
         this.currentEditingPcId = null;
     }
     
+    
+    
     async savePC() {
-        if (!this.validateForm()) return;
-        
+        if (!this.pcForm.checkValidity()) {
+            this.pcForm.reportValidity();
+            return;
+        }
+
         const formData = new FormData(this.pcForm);
         const pcData = {
-            name: formData.get('name').trim(),
-            description: formData.get('description').trim() || null,
-            mac_address: formData.get('mac_address').trim(),
-            ip_address: formData.get('ip_address').trim(),
-            ssh_user: formData.get('ssh_user').trim(),
-            ssh_key_path: formData.get('ssh_key_path').trim() || null,
-            ssh_port: parseInt(formData.get('ssh_port')) || 22,
-            rdp_port: parseInt(formData.get('rdp_port')) || 3389,
-            boot_command: formData.get('boot_command').trim() || 'bootWin',
-            is_active: formData.has('is_active')
+            name: formData.get('name'),
+            description: formData.get('description'),
+            mac_address: formData.get('mac_address'),
+            ip_address: formData.get('ip_address'),
+            boot_command: formData.get('boot_command'),
+            ubuntu_ssh: {
+                user: formData.get('ubuntu_ssh_user'),
+                password: formData.get('ubuntu_ssh_password'),
+                key_text: formData.get('ubuntu_ssh_key_text'),
+                port: parseInt(formData.get('ubuntu_ssh_port')),
+            },
+            windows_ssh: {
+                user: formData.get('windows_ssh_user'),
+                password: formData.get('windows_ssh_password'),
+                key_text: formData.get('windows_ssh_key_text'),
+                port: parseInt(formData.get('windows_ssh_port')),
+            },
         };
-        
+
         if (this.currentEditingPcId) {
             pcData.id = this.currentEditingPcId;
         }
-        
+
+        const url = this.currentEditingPcId ? `/api/pcs/${this.currentEditingPcId}` : '/api/pcs';
+        const method = this.currentEditingPcId ? 'PUT' : 'POST';
+
         try {
-            const url = this.currentEditingPcId ? `/api/pcs/${this.currentEditingPcId}` : '/api/pcs';
-            const method = this.currentEditingPcId ? 'PUT' : 'POST';
-            
             const response = await fetch(url, {
                 method: method,
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(pcData)
+                body: JSON.stringify(pcData),
             });
-            
+
             const result = await response.json();
-            
+
             if (response.ok) {
-                this.uiManager.showNotification(
-                    this.currentEditingPcId ? 'PC가 성공적으로 수정되었습니다.' : 'PC가 성공적으로 추가되었습니다.',
-                    'success'
-                );
+                this.uiManager.showNotification(result.message, 'success');
                 this.closePcModal();
                 await this.loadPCs();
             } else {
-                this.uiManager.showNotification(result.detail || '저장에 실패했습니다.', 'error');
+                this.uiManager.showNotification(result.detail || 'PC 저장에 실패했습니다', 'error');
             }
-            
         } catch (error) {
-            console.error('PC 저장 오류:', error);
-            this.uiManager.showNotification('저장 중 오류가 발생했습니다.', 'error');
+            this.uiManager.showNotification('PC 저장 중 오류가 발생했습니다', 'error');
         }
     }
-    
-    validateForm() {
-        const form = this.pcForm;
-        if (!form.checkValidity()) {
-            form.reportValidity();
-            return false;
-        }
-        
-        // MAC 주소 추가 검증
-        const macInput = document.getElementById('mac_address');
-        const macPattern = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-        
-        if (!macPattern.test(macInput.value)) {
-            macInput.setCustomValidity('올바른 MAC 주소 형식을 입력해주세요. (예: AA:BB:CC:DD:EE:FF)');
-            macInput.reportValidity();
-            return false;
-        } else {
-            macInput.setCustomValidity('');
-        }
-        
-        return true;
-    }
-    
+
     showDeletePCConfirmation(pcId) {
         const pc = this.pcs.get(pcId);
         if (!pc) return;
@@ -688,8 +690,10 @@ class PCManager {
     }
     
     async refreshAllPCs() {
-        this.uiManager.showNotification('PC 상태를 새로고침하고 있습니다...', 'info');
-        
+        const refreshAllBtn = document.getElementById('refreshAllBtn');
+        const originalText = refreshAllBtn.textContent;
+        this.uiManager.showLoading(refreshAllBtn, '새로고침 중...');
+
         try {
             const response = await fetch('/api/status');
             if (response.ok) {
@@ -700,6 +704,8 @@ class PCManager {
         } catch (error) {
             console.error('상태 새로고침 오류:', error);
             this.uiManager.showNotification('상태 새로고침에 실패했습니다.', 'error');
+        } finally {
+            this.uiManager.hideLoading(refreshAllBtn, originalText);
         }
     }
 }

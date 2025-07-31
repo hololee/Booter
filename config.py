@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -46,7 +46,7 @@ class SSHConfig(BaseModel):
 class PCConfig(BaseModel):
     """PC 설정 정보"""
 
-    id: str = Field(..., description="PC 고유 식별자")
+    id: Optional[str] = Field(None, description="PC 고유 식별자")
     name: str = Field(..., description="PC 이름")
     mac_address: str = Field(..., description="MAC 주소", pattern=r"^([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})$")
     ip_address: str = Field(..., description="IP 주소")
@@ -176,23 +176,23 @@ class PCManager:
         except Exception as e:
             print(f"PC 설정 저장 실패: {e}")
 
-    def add_pc(self, pc_config: PCConfig) -> bool:
+    def add_pc(self, pc_config: PCConfig) -> Tuple[bool, str]:
         """PC 추가"""
         if len(self.pcs) >= self.config.MAX_PCS:
-            return False
+            return False, "MAX_PCS_REACHED"
 
         # ID 중복 확인
         if pc_config.id in self.pcs:
-            return False
+            return False, "ID_EXISTS"
 
         # 이름 중복 확인
         for pc in self.pcs.values():
             if pc.name == pc_config.name:
-                return False
+                return False, "NAME_EXISTS"
 
         self.pcs[pc_config.id] = pc_config
         self.save_pcs()
-        return True
+        return True, "SUCCESS"
 
     def update_pc(self, pc_id: str, pc_config: PCConfig) -> bool:
         """PC 수정"""
