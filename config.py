@@ -6,6 +6,33 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class VMConfig(BaseModel):
+    """VM 설정 정보"""
+
+    id: str = Field(..., description="VM 고유 식별자")
+    name: str = Field(..., description="VM 이름")
+    vm_type: str = Field(..., description="VM 타입 (qemu/lxc)")
+    vm_id: int = Field(..., description="Proxmox VM/LXC ID")
+    node_name: str = Field(..., description="Proxmox 노드 이름")
+    node_address: str = Field(..., description="Proxmox 노드 주소 (포트 포함)")
+    api_token: str = Field(..., description="Proxmox API 토큰")
+    description: Optional[str] = Field(None, description="VM 설명")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "vm-001",
+                "name": "Development Server",
+                "vm_type": "qemu",
+                "vm_id": 100,
+                "node_name": "pve",
+                "node_address": "192.168.1.10:8006",
+                "api_token": "PVEAPIToken=user@pam!token=uuid",
+                "description": "개발 서버",
+            }
+        }
+
+
 class SSHConfig(BaseModel):
     """SSH 설정 정보"""
 
@@ -90,9 +117,10 @@ class PCConfig(BaseModel):
 class Config:
     """애플리케이션 설정"""
 
-    # PC 데이터 저장 경로
+    # 데이터 저장 경로
     DATA_DIR = Path("data")
     PC_DATA_FILE = DATA_DIR / "pc_data.json"
+    VM_DATA_FILE = DATA_DIR / "vm_data.json"
 
     # 타임아웃 설정
     BOOT_TIMEOUT = int(os.getenv("BOOT_TIMEOUT", "300"))  # 5분
@@ -208,8 +236,110 @@ class PCManager:
         return list(self.pcs.values())
 
 
-# 전역 PC 관리자 인스턴스
+class VMManager:
+    """VM 설정 관리자"""
+
+    def __init__(self):
+        self.config = Config()
+        self.vms: Dict[str, VMConfig] = {}
+        self.load_vms()
+
+    def load_vms(self):
+        """VM 설정 파일 로드"""
+        try:
+            if self.config.VM_DATA_FILE.exists():
+                with open(self.config.VM_DATA_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for vm_data in data.get("vms", []):
+                        vm_config = VMConfig(**vm_data)
+                        self.vms[vm_config.id] = vm_config
+            else:
+                # 초기에는 빈 VM 목록으로 시작
+                self.save_vms()
+        except Exception as e:
+            print(f"VM 설정 로드 실패: {e}")
+            # 오류 시에도 빈 VM 목록으로 초기화
+            self.vms = {}
+            self.save_vms()
+
+    def save_vms(self):
+        """VM 설정 파일 저장"""
+        try:
+            # data 디렉터리 생성
+            self.config.DATA_DIR.mkdir(exist_ok=True)
+
+            data = {"vms": [vm.dict() for vm in self.vms.values()], "version": "1.0"}
+            with open(self.config.VM_DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"VM 설정 저장 실패: {e}")
+
+    def add_vm(self, vm_config: VMConfig) -> bool:
+        """VM 추가"""
+        # ID 중복 확인
+        if vm_config.id in self.vms:
+            return False
+
+        # 이름 중복 확인
+        for vm in self.vms.values():
+            if vm.name == vm_config.name:
+                return False
+
+        # VM ID 중복 확인 (같은 노드에서)
+        for vm in self.vms.values():
+            if vm.node_name == vm_config.node_name and vm.vm_id == vm_config.vm_id:
+                return False
+
+        self.vms[vm_config.id] = vm_config
+        self.save_vms()
+        return True
+
+    def update_vm(self, vm_id: str, vm_config: VMConfig) -> bool:
+        """VM 수정"""
+        if vm_id not in self.vms:
+            return False
+
+        # 이름 중복 확인 (자기 자신 제외)
+        for existing_id, vm in self.vms.items():
+            if existing_id != vm_id and vm.name == vm_config.name:
+                return False
+
+        # VM ID 중복 확인 (자기 자신 제외, 같은 노드에서)
+        for existing_id, vm in self.vms.items():
+            if existing_id != vm_id and vm.node_name == vm_config.node_name and vm.vm_id == vm_config.vm_id:
+                return False
+
+        # ID 변경 시 기존 VM 삭제하고 새로 추가
+        if vm_id != vm_config.id:
+            if vm_config.id in self.vms:
+                return False  # 새 ID가 이미 존재
+            del self.vms[vm_id]
+
+        self.vms[vm_config.id] = vm_config
+        self.save_vms()
+        return True
+
+    def delete_vm(self, vm_id: str) -> bool:
+        """VM 삭제"""
+        if vm_id not in self.vms:
+            return False
+
+        del self.vms[vm_id]
+        self.save_vms()
+        return True
+
+    def get_vm(self, vm_id: str) -> Optional[VMConfig]:
+        """VM 조회"""
+        return self.vms.get(vm_id)
+
+    def get_all_vms(self) -> List[VMConfig]:
+        """모든 VM 조회"""
+        return list(self.vms.values())
+
+
+# 전역 관리자 인스턴스
 pc_manager = PCManager()
+vm_manager = VMManager()
 
 # 하위 호환성을 위한 config 인스턴스
 config = Config()

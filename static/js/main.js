@@ -7,6 +7,10 @@ class MultiPCController {
         this.pcs = new Map();
         this.bootingPCs = new Map(); // 부팅 중인 PC들과 정보 추적 {pcId: {startTime, targetOS}}
         this.bootTimeoutDuration = 3 * 60 * 1000; // 3분 (밀리초)
+        
+        this.vms = new Map(); 
+        this.vmTasks = new Map(); // VM 작업 추적
+        this.vmStatuses = new Map(); // VM 상태 저장
         this.isEditing = false;
         
         // localStorage에서 부팅 상태 복원
@@ -16,12 +20,16 @@ class MultiPCController {
         // 현재 선택된 메뉴 타입 (pc 또는 vm)
         this.currentMenuType = 'pc';
         
+        // 모니터링 상태 플래그
+        this.pcMonitoringEnabled = true;  // PC 탭이 기본이므로 PC 모니터링 활성화
+        this.vmMonitoringEnabled = false; // VM 모니터링은 비활성화
+        
         this.initializeElements();
         this.attachEventListeners();
         this.connectWebSocket();
         
         // 초기 상태 설정 (PC 메뉴가 기본 선택)
-        this.showAddButton();
+        this.switchMenu('pc');
         this.loadPCs();
     }
     
@@ -38,10 +46,14 @@ class MultiPCController {
         
         // 헤더 버튼들
         this.addPcBtn = document.getElementById('addPcBtn');
+        this.addVmBtn = document.getElementById('addVmBtn');
         this.refreshAllBtn = document.getElementById('refreshAllBtn');
         
         // PC 그리드
         this.pcGrid = document.getElementById('pcGrid');
+        
+        // VM 그리드
+        this.vmGrid = document.getElementById('vmGrid');
         
         
         // 모달 요소들
@@ -51,11 +63,24 @@ class MultiPCController {
         this.cancelBtn = document.getElementById('cancelBtn');
         this.saveBtn = document.getElementById('saveBtn');
         
+        // VM 모달 요소들
+        this.vmModal = document.getElementById('vmModal');
+        this.vmForm = document.getElementById('vmForm');
+        this.vmModalTitle = document.getElementById('vmModalTitle');
+        this.vmCancelBtn = document.getElementById('vmCancelBtn');
+        this.vmSaveBtn = document.getElementById('vmSaveBtn');
+        
         // 삭제 모달
         this.deleteModal = document.getElementById('deleteModal');
         this.deletePcName = document.getElementById('deletePcName');
         this.cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
         this.confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        
+        // VM 삭제 모달
+        this.deleteVmModal = document.getElementById('deleteVmModal');
+        this.deleteVmName = document.getElementById('deleteVmName');
+        this.cancelDeleteVmBtn = document.getElementById('cancelDeleteVmBtn');
+        this.confirmDeleteVmBtn = document.getElementById('confirmDeleteVmBtn');
         
         // 취소 확인 모달
         this.cancelModal = document.getElementById('cancelModal');
@@ -85,15 +110,24 @@ class MultiPCController {
         
         // 헤더 버튼 이벤트
         this.addPcBtn.addEventListener('click', () => this.openAddPcModal());
-        this.refreshAllBtn.addEventListener('click', () => this.refreshAllPCs());
+        this.addVmBtn.addEventListener('click', () => this.openAddVmModal());
+        this.refreshAllBtn.addEventListener('click', () => this.refreshAll());
         
-        // 모달 이벤트
+        // PC 모달 이벤트
         this.cancelBtn.addEventListener('click', () => this.showCancelConfirmation());
         this.pcForm.addEventListener('submit', (e) => this.handlePcSubmit(e));
         
-        // 삭제 모달 이벤트
+        // VM 모달 이벤트
+        this.vmCancelBtn.addEventListener('click', () => this.closeVmModal());
+        this.vmForm.addEventListener('submit', (e) => this.handleVmSubmit(e));
+        
+        // PC 삭제 모달 이벤트
         this.cancelDeleteBtn.addEventListener('click', () => this.closeDeleteModal());
         this.confirmDeleteBtn.addEventListener('click', () => this.confirmDeletePc());
+        
+        // VM 삭제 모달 이벤트
+        this.cancelDeleteVmBtn.addEventListener('click', () => this.closeDeleteVmModal());
+        this.confirmDeleteVmBtn.addEventListener('click', () => this.confirmDeleteVm());
         
         // 취소 확인 모달 이벤트
         this.keepEditingBtn.addEventListener('click', () => this.closeCancelModal());
@@ -103,9 +137,13 @@ class MultiPCController {
         // SSH 관련 이벤트 리스너들
         this.initializeSSHEventListeners();
         
-        // 모달 배경 클릭 시 닫기 비활성화 (PC 모달만)
+        // 모달 배경 클릭 시 닫기
         this.deleteModal.addEventListener('click', (e) => {
             if (e.target === this.deleteModal) this.closeDeleteModal();
+        });
+        
+        this.deleteVmModal.addEventListener('click', (e) => {
+            if (e.target === this.deleteVmModal) this.closeDeleteVmModal();
         });
         
         this.cancelModal.addEventListener('click', (e) => {
@@ -126,7 +164,15 @@ class MultiPCController {
     connectWebSocket() {
         try {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            // 0.0.0.0을 localhost로 변환
+            let host = window.location.host;
+            if (host.startsWith('0.0.0.0:')) {
+                host = host.replace('0.0.0.0:', 'localhost:');
+            }
+            
+            const wsUrl = `${protocol}//${host}/ws`;
+            console.log('WebSocket 연결 시도:', wsUrl);
             
             this.ws = new WebSocket(wsUrl);
             
@@ -309,12 +355,19 @@ class MultiPCController {
     }
     
     updateAllStatus(data) {
-        if (data.pc_statuses) {
+        // PC 모니터링이 활성화된 경우에만 PC 상태 업데이트
+        if (this.pcMonitoringEnabled && data.pc_statuses) {
             Object.entries(data.pc_statuses).forEach(([pcId, status]) => {
                 this.updatePCStatus(pcId, status);
             });
         }
         
+        // VM 모니터링이 활성화된 경우에만 VM 상태 업데이트
+        if (this.vmMonitoringEnabled && data.vm_statuses) {
+            Object.entries(data.vm_statuses).forEach(([vmId, status]) => {
+                this.updateVMCardStatus(vmId, status);
+            });
+        }
     }
     
     updatePCStatus(pcId, status) {
@@ -1120,15 +1173,8 @@ class MultiPCController {
         const menuType = selectedItem.dataset.menu;
         this.currentMenuType = menuType;
         
-        if (menuType === 'pc') {
-            // PC 메뉴 선택 시 PC 목록 표시 및 추가 버튼 보이기
-            this.showAddButton();
-            this.loadPCs();
-        } else if (menuType === 'vm') {
-            // VM 메뉴 선택 시 VM 목록 표시 및 추가 버튼 숨기기
-            this.hideAddButton();
-            this.loadVMs();
-        }
+        // switchMenu 메서드를 사용하여 일관성 있게 처리
+        this.switchMenu(menuType);
         
         // 모바일에서는 메뉴 선택 후 사이드바 닫기
         if (window.innerWidth <= 768) {
@@ -1148,6 +1194,411 @@ class MultiPCController {
         }
     }
     
+    // VM과 PC 메뉴 전환
+    switchMenu(menuType) {
+        this.currentMenuType = menuType;
+        
+        // 그리드 표시/숨김 및 모니터링 최적화
+        if (menuType === 'pc') {
+            this.pcGrid.style.display = 'grid';
+            this.vmGrid.style.display = 'none';
+            this.addPcBtn.style.display = 'block';
+            this.addVmBtn.style.display = 'none';
+            
+            // PC 탭 활성화 시: PC 상태만 업데이트
+            this.enablePCMonitoring();
+            this.disableVMMonitoring();
+            
+        } else if (menuType === 'vm') {
+            this.pcGrid.style.display = 'none';
+            this.vmGrid.style.display = 'grid';
+            this.addPcBtn.style.display = 'none';
+            this.addVmBtn.style.display = 'block';
+            
+            // VM 탭 활성화 시: VM 상태만 업데이트
+            this.enableVMMonitoring();
+            this.disablePCMonitoring();
+            this.loadVMs();
+        }
+        
+        // 서버에 탭 변경 알림
+        this.notifyTabChange(menuType);
+        
+        // 메뉴 항목 활성화 표시
+        this.menuItems.forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.menu === menuType) {
+                item.classList.add('active');
+            }
+        });
+    }
+    
+    // 전체 새로고침 (PC와 VM 모두)
+    async refreshAll() {
+        if (this.currentMenuType === 'pc') {
+            await this.refreshAllPCs();
+        } else if (this.currentMenuType === 'vm') {
+            await this.refreshAllVMs();
+        }
+    }
+    
+    // VM 관련 메서드들
+    async loadVMs() {
+        try {
+            const response = await fetch('/api/vms');
+            const data = await response.json();
+            
+            this.vms.clear();
+            data.vms.forEach(vm => {
+                this.vms.set(vm.id, vm);
+            });
+            
+            // VM 상태도 로드
+            await this.loadVMStatuses();
+            
+            this.renderVMGrid();
+        } catch (error) {
+            console.error('VM 목록 로드 실패:', error);
+            this.showNotification('VM 목록을 불러오는데 실패했습니다.', 'error');
+        }
+    }
+    
+    async loadVMStatuses() {
+        try {
+            const response = await fetch('/api/vms/status');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            this.vmStatuses.clear();
+            data.vm_statuses.forEach(status => {
+                this.vmStatuses.set(status.vm_id, status);
+            });
+        } catch (error) {
+            console.error('VM 상태 로드 실패:', error);
+        }
+    }
+    
+    renderVMGrid() {
+        if (this.vms.size === 0) {
+            this.renderEmptyVMState();
+            return;
+        }
+        
+        const vmCards = Array.from(this.vms.values()).map(vm => this.createVMCard(vm));
+        this.vmGrid.innerHTML = vmCards.join('');
+    }
+    
+    renderEmptyVMState() {
+        this.vmGrid.innerHTML = `
+            <div class="empty-state">
+                <h3>등록된 VM이 없습니다</h3>
+                <p>VM 추가 버튼을 클릭하여 첫 번째 VM을 등록하세요.</p>
+                <button class="btn btn-primary" onclick="app.openAddVmModal()">VM 추가</button>
+            </div>
+        `;
+    }
+    
+    createVMCard(vm) {
+        const statusClass = this.getVMStatusClass(vm.id);
+        const statusText = this.getVMStatusText(vm.id);
+        const isRunning = statusText === 'running';
+        
+        
+        return `
+            <div class="vm-card" data-vm-id="${vm.id}">
+                <div class="vm-card-header">
+                    <div class="vm-card-title">
+                        <div class="vm-status-dot ${statusClass}"></div>
+                        <div>
+                            <div class="vm-name">${vm.name}</div>
+                            ${vm.description ? `<div class="vm-description">${vm.description}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="vm-card-actions">
+                        <button class="icon-btn" onclick="app.editVM('${vm.id}')" title="편집">
+                            <img src="/static/resources/edit.svg" alt="Edit" class="action-icon">
+                        </button>
+                        <button class="icon-btn" onclick="app.showDeleteVMConfirmation('${vm.id}')" title="삭제">
+                            <img src="/static/resources/trash.svg" alt="Delete" class="action-icon">
+                        </button>
+                    </div>
+                </div>
+                <div class="vm-card-body">
+                    <div class="vm-info">
+                        <div class="vm-info-item">
+                            <span class="vm-info-label">타입</span>
+                            <span class="vm-info-value">${vm.vm_type.toUpperCase()}</span>
+                        </div>
+                        <div class="vm-info-item">
+                            <span class="vm-info-label">VM ID</span>
+                            <span class="vm-info-value">${vm.vm_id}</span>
+                        </div>
+                        <div class="vm-info-item">
+                            <span class="vm-info-label">노드</span>
+                            <span class="vm-info-value">${vm.node_name}</span>
+                        </div>
+                        <div class="vm-info-item">
+                            <span class="vm-info-label">상태</span>
+                            <span class="vm-info-value vm-status-text">${statusText}</span>
+                        </div>
+                    </div>
+                    <button class="vm-control-button ${isRunning ? 'down' : 'up'}" 
+                            onclick="app.toggleVM('${vm.id}', ${isRunning})"
+                            data-vm-id="${vm.id}">
+                        ${isRunning ? 'DOWN' : 'UP'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    getVMStatusClass(vmId) {
+        // VM 상태에 따른 CSS 클래스 반환
+        const status = this.getVMStatusText(vmId);
+        switch (status) {
+            case 'running': return 'running';
+            case 'stopped': return 'stopped';
+            case 'starting': return 'starting';
+            default: return 'stopped';
+        }
+    }
+    
+    getVMStatusText(vmId) {
+        const status = this.vmStatuses.get(vmId);
+        return status ? status.status : 'unknown';
+    }
+    
+    async toggleVM(vmId, isRunning) {
+        try {
+            const action = isRunning ? 'stop' : 'start';
+            const response = await fetch(`/api/vms/${vmId}/${action}`, {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.showNotification(`VM ${action} 요청이 전송되었습니다.`, 'success');
+                
+                // 작업 상태 추적
+                if (data.task_id) {
+                    this.trackVMTask(data.task_id, vmId, action);
+                }
+            } else {
+                throw new Error(`VM ${action} 실패`);
+            }
+        } catch (error) {
+            console.error(`VM ${isRunning ? 'stop' : 'start'} 실패:`, error);
+            this.showNotification(`VM ${isRunning ? '정지' : '시작'}에 실패했습니다.`, 'error');
+        }
+    }
+    
+    async trackVMTask(taskId, vmId, action) {
+        const checkInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`/api/vm-tasks/${taskId}`);
+                if (response.ok) {
+                    const task = await response.json();
+                    
+                    if (task.status === 'completed') {
+                        clearInterval(checkInterval);
+                        this.showNotification(`VM ${action} 완료`, 'success');
+                        this.refreshVMStatus(vmId);
+                    } else if (task.status === 'failed') {
+                        clearInterval(checkInterval);
+                        this.showNotification(`VM ${action} 실패: ${task.message}`, 'error');
+                        this.refreshVMStatus(vmId);
+                    }
+                }
+            } catch (error) {
+                console.error('VM 작업 상태 확인 실패:', error);
+            }
+        }, 2000);
+    }
+    
+    async refreshVMStatus(vmId) {
+        try {
+            const response = await fetch(`/api/vms/${vmId}/status`);
+            if (response.ok) {
+                const status = await response.json();
+                this.updateVMCardStatus(vmId, status);
+            }
+        } catch (error) {
+            console.error('VM 상태 업데이트 실패:', error);
+        }
+    }
+    
+    updateVMCardStatus(vmId, status) {
+        // 내부 상태 업데이트
+        this.vmStatuses.set(vmId, status);
+        
+        const vmCard = document.querySelector(`[data-vm-id="${vmId}"]`);
+        if (vmCard) {
+            const statusDot = vmCard.querySelector('.vm-status-dot');
+            const statusText = vmCard.querySelector('.vm-status-text');
+            const controlButton = vmCard.querySelector('.vm-control-button');
+            
+            // 상태 도트 업데이트
+            statusDot.className = `vm-status-dot ${this.getVMStatusClassFromStatus(status.status)}`;
+            
+            // 상태 텍스트 업데이트 (올바른 요소 선택)
+            if (statusText) {
+                statusText.textContent = status.status;
+            } else {
+                console.error(`VM ${vmId} 상태 텍스트 요소를 찾을 수 없음`);
+            }
+            
+            // 컨트롤 버튼 업데이트
+            const isRunning = status.status === 'running';
+            controlButton.className = `vm-control-button ${isRunning ? 'down' : 'up'}`;
+            controlButton.textContent = isRunning ? 'DOWN' : 'UP';
+            controlButton.onclick = () => this.toggleVM(vmId, isRunning);
+        }
+    }
+    
+    getVMStatusClassFromStatus(status) {
+        switch (status) {
+            case 'running': return 'running';
+            case 'stopped': return 'stopped';
+            case 'starting': return 'starting';
+            default: return 'stopped';
+        }
+    }
+    
+    async refreshAllVMs() {
+        try {
+            this.showNotification('VM 상태를 새로고침 중...', 'info');
+            
+            // VM 목록과 상태를 모두 새로고침
+            await this.loadVMs();
+            
+            this.showNotification('VM 상태가 업데이트되었습니다.', 'success');
+        } catch (error) {
+            console.error('VM 새로고침 실패:', error);
+            this.showNotification('VM 새로고침에 실패했습니다.', 'error');
+        }
+    }
+    
+    // VM 모달 관련 메서드들
+    openAddVmModal() {
+        this.vmModalTitle.textContent = 'VM 추가';
+        this.vmForm.reset();
+        this.currentEditingVmId = null;
+        this.vmModal.classList.add('show');
+    }
+    
+    editVM(vmId) {
+        const vm = this.vms.get(vmId);
+        if (!vm) return;
+        
+        this.vmModalTitle.textContent = 'VM 편집';
+        this.currentEditingVmId = vmId;
+        
+        // 폼 필드 채우기
+        document.getElementById('vmName').value = vm.name;
+        document.getElementById('vmDescription').value = vm.description || '';
+        document.getElementById('vmType').value = vm.vm_type;
+        document.getElementById('vmId').value = vm.vm_id;
+        document.getElementById('nodeName').value = vm.node_name;
+        document.getElementById('nodeAddress').value = vm.node_address;
+        document.getElementById('apiToken').value = vm.api_token;
+        
+        this.vmModal.classList.add('show');
+    }
+    
+    closeVmModal() {
+        this.vmModal.classList.remove('show');
+        this.currentEditingVmId = null;
+    }
+    
+    async handleVmSubmit(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this.vmForm);
+        const vmData = {
+            id: this.currentEditingVmId || `vm-${Date.now()}`,
+            name: formData.get('name'),
+            description: formData.get('description'),
+            vm_type: formData.get('vm_type'),
+            vm_id: parseInt(formData.get('vm_id')),
+            node_name: formData.get('node_name'),
+            node_address: formData.get('node_address'),
+            api_token: formData.get('api_token')
+        };
+        
+        try {
+            let response;
+            if (this.currentEditingVmId) {
+                // VM 수정
+                response = await fetch(`/api/vms/${this.currentEditingVmId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(vmData)
+                });
+            } else {
+                // VM 추가
+                response = await fetch('/api/vms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(vmData)
+                });
+            }
+            
+            if (response.ok) {
+                this.showNotification(
+                    this.currentEditingVmId ? 'VM이 수정되었습니다.' : 'VM이 추가되었습니다.',
+                    'success'
+                );
+                this.closeVmModal();
+                await this.loadVMs();
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'VM 저장 실패');
+            }
+        } catch (error) {
+            console.error('VM 저장 실패:', error);
+            this.showNotification(error.message || 'VM 저장에 실패했습니다.', 'error');
+        }
+    }
+    
+    showDeleteVMConfirmation(vmId) {
+        const vm = this.vms.get(vmId);
+        if (!vm) return;
+        
+        this.deleteVmName.textContent = vm.name;
+        this.currentDeletingVmId = vmId;
+        this.deleteVmModal.classList.add('show');
+    }
+    
+    closeDeleteVmModal() {
+        this.deleteVmModal.classList.remove('show');
+        this.currentDeletingVmId = null;
+    }
+    
+    async confirmDeleteVm() {
+        if (!this.currentDeletingVmId) return;
+        
+        try {
+            const response = await fetch(`/api/vms/${this.currentDeletingVmId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                this.showNotification('VM이 삭제되었습니다.', 'success');
+                this.closeDeleteVmModal();
+                await this.loadVMs();
+            } else {
+                throw new Error('VM 삭제 실패');
+            }
+        } catch (error) {
+            console.error('VM 삭제 실패:', error);
+            this.showNotification('VM 삭제에 실패했습니다.', 'error');
+        }
+    }
+    
     // 창 크기 변경 시 사이드바 상태 조정
     handleResize() {
         const isMobile = window.innerWidth <= 768;
@@ -1161,6 +1612,36 @@ class MultiPCController {
         } else {
             // 데스크톱으로 전환 시 오버레이 제거
             this.mobileOverlay.classList.remove('show');
+        }
+    }
+    
+    // 모니터링 제어 메서드들
+    enablePCMonitoring() {
+        this.pcMonitoringEnabled = true;
+    }
+    
+    disablePCMonitoring() {
+        this.pcMonitoringEnabled = false;
+    }
+    
+    enableVMMonitoring() {
+        this.vmMonitoringEnabled = true;
+    }
+    
+    disableVMMonitoring() {
+        this.vmMonitoringEnabled = false;
+    }
+    
+    // 서버에 탭 변경 알림
+    notifyTabChange(tabType) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            const message = {
+                type: "tab_change",
+                data: {
+                    tab: tabType
+                }
+            };
+            this.ws.send(JSON.stringify(message));
         }
     }
 }
