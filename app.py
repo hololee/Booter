@@ -6,9 +6,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from config import PCConfig, pc_manager
+from config import PCConfig, VMConfig, pc_manager, vm_manager
 from services.connection_manager import connection_manager
 from services.pc_controller import pc_controller
+from services.vm_controller import vm_controller
 
 app = FastAPI(title="WOL Dual Boot Controller", version="1.0.0")
 
@@ -192,6 +193,120 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
 
 
+# VM 관리 API
+@app.get("/api/vms")
+async def get_all_vms():
+    """모든 VM 목록 조회"""
+    vms = vm_manager.get_all_vms()
+    return {"vms": [vm.dict() for vm in vms]}
+
+
+@app.get("/api/vms/status")
+async def get_all_vm_statuses():
+    """모든 VM 상태 확인"""
+    vm_statuses = vm_controller.get_all_vm_statuses()
+    result = {"vm_statuses": [status.to_dict() for status in vm_statuses]}
+    logger.info(f"VM 상태 API 응답: {result}")
+    return result
+
+
+@app.get("/api/vms/{vm_id}")
+async def get_vm(vm_id: str):
+    """특정 VM 조회"""
+    vm = vm_manager.get_vm(vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+    return vm.dict()
+
+
+@app.post("/api/vms")
+async def add_vm(vm_config: VMConfig):
+    """VM 추가"""
+    success = vm_manager.add_vm(vm_config)
+    if success:
+        # VM 컨트롤러에도 추가
+        vm_controller.add_vm(vm_config)
+        return {"status": "success", "message": "VM added successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to add VM (duplicate name, ID, or VM ID on same node)")
+
+
+@app.put("/api/vms/{vm_id}")
+async def update_vm(vm_id: str, vm_config: VMConfig):
+    """VM 수정"""
+    success = vm_manager.update_vm(vm_id, vm_config)
+    if success:
+        # VM 컨트롤러에서도 이름 업데이트
+        vm_controller.update_vm_name(vm_config.id, vm_config.name)
+        return {"status": "success", "message": "VM updated successfully"}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to update VM (duplicate name, ID, or VM ID on same node)")
+
+
+@app.delete("/api/vms/{vm_id}")
+async def delete_vm(vm_id: str):
+    """VM 삭제"""
+    success = vm_manager.delete_vm(vm_id)
+    if success:
+        # VM 컨트롤러에서도 제거
+        vm_controller.remove_vm(vm_id)
+        return {"status": "success", "message": "VM deleted successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+
+@app.post("/api/vms/{vm_id}/start")
+async def start_vm(vm_id: str):
+    """VM 시작"""
+    vm = vm_manager.get_vm(vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+    try:
+        task_id = await vm_controller.start_vm(vm_id)
+        return {"status": "success", "message": "VM start initiated", "task_id": task_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/vms/{vm_id}/stop")
+async def stop_vm(vm_id: str):
+    """VM 정지"""
+    vm = vm_manager.get_vm(vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+    try:
+        task_id = await vm_controller.stop_vm(vm_id)
+        return {"status": "success", "message": "VM stop initiated", "task_id": task_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/vms/{vm_id}/status")
+async def get_vm_status(vm_id: str):
+    """VM 상태 확인"""
+    vm = vm_manager.get_vm(vm_id)
+    if not vm:
+        raise HTTPException(status_code=404, detail="VM not found")
+
+    vm_status = vm_controller.get_vm_status(vm_id)
+    if vm_status:
+        return vm_status.to_dict()
+    else:
+        raise HTTPException(status_code=404, detail="VM status not found")
+
+
+@app.get("/api/vm-tasks/{task_id}")
+async def get_vm_task_status(task_id: str):
+    """VM 작업 상태 확인"""
+    task = vm_controller.get_task(task_id)
+    if task:
+        return task.to_dict()
+    else:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+
 # 하위 호환성을 위한 기존 API (기본 PC 사용)
 @app.post("/boot/ubuntu")
 async def boot_ubuntu_legacy():
@@ -243,11 +358,41 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # 클라이언트로부터 메시지 수신
-            _ = await websocket.receive_text()
+            message_text = await websocket.receive_text()
+
+            try:
+                # JSON 메시지 파싱
+                import json
+
+                message = json.loads(message_text)
+
+                # 탭 전환 메시지 처리
+                if message.get("type") == "tab_change":
+                    tab_type = message.get("data", {}).get("tab")
+                    if tab_type in ["pc", "vm"]:
+                        connection_manager.set_client_active_tab(websocket, tab_type)
+                        logger.info(f"클라이언트 탭 변경: {tab_type}")
+
+            except json.JSONDecodeError:
+                # JSON이 아닌 경우는 무시하고 기존 동작 유지
+                pass
+
             # 상태 업데이트 브로드캐스트
             await connection_manager.broadcast_status()
     except WebSocketDisconnect:
         connection_manager.disconnect(websocket)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """앱 시작 시 VM 상태 모니터링 시작"""
+    await vm_controller.start_status_monitoring()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """앱 종료 시 VM 상태 모니터링 중지"""
+    await vm_controller.stop_status_monitoring()
 
 
 if __name__ == "__main__":

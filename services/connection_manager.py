@@ -7,6 +7,7 @@ from typing import List
 from fastapi import WebSocket
 
 from services.pc_controller import PCState, pc_controller
+from services.vm_controller import vm_controller
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,15 @@ class ConnectionManager:
         self.active_connections: List[WebSocket] = []
         self.status_broadcast_task = None
         self.is_broadcasting = False
+        # 각 연결별 활성 탭 정보 저장
+        self.client_active_tabs = {}  # {websocket: "pc" or "vm"}
 
     async def connect(self, websocket: WebSocket):
         """새로운 WebSocket 연결 추가"""
         await websocket.accept()
         self.active_connections.append(websocket)
+        # 기본값으로 PC 탭 설정
+        self.client_active_tabs[websocket] = "pc"
         logger.info(f"새로운 WebSocket 연결 추가. 총 연결 수: {len(self.active_connections)}")
 
         # 첫 번째 연결이면 상태 브로드캐스트 시작
@@ -36,11 +41,20 @@ class ConnectionManager:
         """WebSocket 연결 제거"""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+            # 활성 탭 정보도 제거
+            if websocket in self.client_active_tabs:
+                del self.client_active_tabs[websocket]
             logger.info(f"WebSocket 연결 제거. 총 연결 수: {len(self.active_connections)}")
 
         # 연결이 없으면 브로드캐스트 중지
         if len(self.active_connections) == 0 and self.is_broadcasting:
             self.stop_status_broadcast()
+
+    def set_client_active_tab(self, websocket: WebSocket, tab_type: str):
+        """클라이언트의 활성 탭 설정"""
+        if websocket in self.active_connections:
+            self.client_active_tabs[websocket] = tab_type
+            logger.info(f"클라이언트 활성 탭 변경: {tab_type}")
 
     async def send_personal_message(self, message: dict, websocket: WebSocket):
         """개별 WebSocket에 메시지 전송"""
@@ -71,18 +85,38 @@ class ConnectionManager:
     async def send_current_status(self, websocket: WebSocket = None):
         """현재 상태 전송"""
         try:
-            # 모든 PC 상태 조회
-            all_statuses = await pc_controller.get_all_pc_status()
+            # 어떤 탭들이 활성화되어 있는지 확인
+            active_tabs = set()
+            if websocket:
+                # 특정 웹소켓에 대해서만 전송하는 경우
+                active_tabs.add(self.client_active_tabs.get(websocket, "pc"))
+            else:
+                # 모든 연결된 클라이언트의 활성 탭 확인
+                for ws in self.active_connections:
+                    active_tabs.add(self.client_active_tabs.get(ws, "pc"))
 
-            # 진행 중인 작업들 추가
-            active_tasks = await pc_controller.get_active_tasks()
+            all_pc_statuses = {}
+            all_vm_statuses = {}
+            active_tasks = {}
+
+            # PC 탭이 활성화된 클라이언트가 있는 경우에만 PC 상태 조회
+            if "pc" in active_tabs:
+                all_pc_statuses = await pc_controller.get_all_pc_status()
+                active_tasks = await pc_controller.get_active_tasks()
+
+            # VM 탭이 활성화된 클라이언트가 있는 경우에만 VM 상태 조회
+            if "vm" in active_tabs:
+                for vm_status in vm_controller.get_all_vm_statuses():
+                    all_vm_statuses[vm_status.vm_id] = vm_status.to_dict()
 
             message = {
                 "type": "status_update",
                 "data": {
-                    "pc_statuses": all_statuses,
+                    "pc_statuses": all_pc_statuses,
+                    "vm_statuses": all_vm_statuses,
                     "active_tasks": active_tasks,
-                    "total_pcs": len(all_statuses),
+                    "total_pcs": len(all_pc_statuses),
+                    "total_vms": len(all_vm_statuses),
                     "timestamp": datetime.now().isoformat(),
                 },
             }

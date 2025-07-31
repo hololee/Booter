@@ -1,0 +1,15 @@
+{
+  "vms": [
+    {
+      "id": "vm-1753967324002",
+      "name": "vm110",
+      "vm_type": "qemu",
+      "vm_id": 110,
+      "node_name": "PVE-PRD-001",
+      "node_address": "10.93.96.2:8006",
+      "api_token": "root@pam!booter=92acda89-9fb7-4c81-8d2f-63c661531b2f",
+      "description": ""
+    }
+  ],
+  "version": "1.0"
+}
