@@ -83,6 +83,7 @@ ssh_keys/
 # 데이터 파일 (런타임에 생성)
 data/
 pc_data.json
+vm_data.json
 
 # 문서
 README.md
