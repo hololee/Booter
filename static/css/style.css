@@ -47,7 +47,7 @@ body {
 .header {
     background-color: #ffffff;
     border-bottom: 1px solid #e2e8f0;
-    padding: 12px 20px 12px 12px; /* 상하 패딩 12px로 통일 */
+    padding: 12px 20px;
     position: fixed;
     top: 0;
     left: 0;
@@ -56,8 +56,6 @@ body {
 }
 
 .header-content {
-    max-width: 1400px;
-    margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: center;
