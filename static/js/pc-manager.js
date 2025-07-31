@@ -138,7 +138,6 @@ class PCManager {
             <div class="empty-state">
                 <h3>등록된 PC가 없습니다</h3>
                 <p>PC 추가 버튼을 클릭하여 첫 번째 PC를 등록하세요.</p>
-                <button class="btn btn-primary" onclick="app.pcManager.openAddModal()">PC 추가</button>
             </div>
         `;
     }
