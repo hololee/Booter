@@ -41,6 +41,11 @@ class UIManager {
         this.menuItems.forEach(item => {
             item.addEventListener('click', () => this.selectMenuItem(item));
         });
+
+        // 비밀번호 토글 버튼
+        document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.togglePasswordVisibility(e));
+        });
     }
     
     attachResizeListener() {
@@ -180,6 +185,23 @@ class UIManager {
             onConfirm();
         } else if (!result && onCancel) {
             onCancel();
+        }
+    }
+
+    togglePasswordVisibility(event) {
+        const btn = event.currentTarget;
+        const targetId = btn.getAttribute('data-target');
+        const passwordInput = document.getElementById(targetId);
+        const icon = btn.querySelector('.eye-icon');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.src = '/static/resources/hide.svg';
+            icon.alt = 'Hide Password';
+        } else {
+            passwordInput.type = 'password';
+            icon.src = '/static/resources/show.svg';
+            icon.alt = 'Show Password';
         }
     }
 }
