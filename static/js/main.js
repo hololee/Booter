@@ -236,13 +236,10 @@ class MultiPCController {
                 const bootInfo = this.bootingPCs.get(pc.id);
                 this.updatePCBootStatus(pc.id, this.getBootingStatusText(bootInfo.targetOS, 'booting'), 'booting');
                 
-                // 부팅 중일 때 버튼 비활성화
+                // 부팅 중일 때 버튼 상태 업데이트
                 const ubuntuBtn = document.getElementById(`ubuntu-btn-${pc.id}`);
                 const windowsBtn = document.getElementById(`windows-btn-${pc.id}`);
-                if (ubuntuBtn && windowsBtn) {
-                    ubuntuBtn.disabled = true;
-                    windowsBtn.disabled = true;
-                }
+                this.updateButtonsForState('booting', ubuntuBtn, windowsBtn);
             }
         });
     }
@@ -298,11 +295,11 @@ class MultiPCController {
                     </div>
                 </div>
                 <div class="pc-boot-buttons">
-                    <button class="boot-btn ubuntu-btn" id="ubuntu-btn-${pc.id}" onclick="app.bootUbuntu('${pc.id}')">
-                        Ubuntu
+                    <button class="boot-btn ubuntu-btn" id="ubuntu-btn-${pc.id}" onclick="app.handleUbuntuButton('${pc.id}')">
+                        ubuntu UP
                     </button>
-                    <button class="boot-btn windows-btn" id="windows-btn-${pc.id}" onclick="app.bootWindows('${pc.id}')">
-                        Windows
+                    <button class="boot-btn windows-btn" id="windows-btn-${pc.id}" onclick="app.handleWindowsButton('${pc.id}')">
+                        windows UP
                     </button>
                 </div>
             </div>
@@ -350,9 +347,8 @@ class MultiPCController {
                 if (status.timestamp) {
                     lastCheck.textContent = this.formatTimestamp(status.timestamp);
                 }
-                // 부팅 중에는 모든 버튼 비활성화
-                ubuntuBtn.disabled = true;
-                windowsBtn.disabled = true;
+                // 부팅 중에는 모든 버튼 비활성화, 텍스트도 업데이트
+                this.updateButtonsForState('booting', ubuntuBtn, windowsBtn);
                 return; // 여기서 함수를 종료하여 '부팅 중' UI 유지
             }
         }
@@ -378,9 +374,8 @@ class MultiPCController {
             lastCheck.textContent = this.formatTimestamp(status.timestamp);
         }
         
-        // 버튼 상태 업데이트 (현재 상태에 따라서만)
-        ubuntuBtn.disabled = status.state === 'ubuntu' || status.state === 'windows';
-        windowsBtn.disabled = status.state === 'windows';
+        // 버튼 상태와 텍스트 업데이트 (상태에 따라)
+        this.updateButtonsForState(status.state, ubuntuBtn, windowsBtn);
     }
     
     
@@ -611,6 +606,147 @@ class MultiPCController {
         }
     }
     
+    // 버튼 상태 업데이트 메서드
+    updateButtonsForState(state, ubuntuBtn, windowsBtn) {
+        if (!ubuntuBtn || !windowsBtn) return;
+        
+        switch (state) {
+            case 'off':
+                // PC가 꺼짐: 두 버튼 활성화, "ubuntu UP", "windows UP"
+                ubuntuBtn.disabled = false;
+                windowsBtn.disabled = false;
+                ubuntuBtn.textContent = 'ubuntu UP';
+                windowsBtn.textContent = 'windows UP';
+                break;
+            case 'ubuntu':
+                // Ubuntu 실행중: "ubuntu DOWN", "windows UP" (둘 다 활성화)
+                ubuntuBtn.disabled = false;
+                windowsBtn.disabled = false;
+                ubuntuBtn.textContent = 'ubuntu DOWN';
+                windowsBtn.textContent = 'windows UP';
+                break;
+            case 'windows':
+                // Windows 실행중: "ubuntu UP", "windows DOWN" (둘 다 활성화)
+                ubuntuBtn.disabled = false;
+                windowsBtn.disabled = false;
+                ubuntuBtn.textContent = 'ubuntu UP';
+                windowsBtn.textContent = 'windows DOWN';
+                break;
+            case 'booting':
+            default:
+                // 부팅중이거나 알 수 없는 상태: 두 버튼 비활성화, "ubuntu UP", "windows UP"
+                ubuntuBtn.disabled = true;
+                windowsBtn.disabled = true;
+                ubuntuBtn.textContent = 'ubuntu UP';
+                windowsBtn.textContent = 'windows UP';
+                break;
+        }
+    }
+    
+    // 버튼 클릭 핸들러들
+    async handleUbuntuButton(pcId) {
+        const pc = this.pcs.get(pcId);
+        if (!pc) return;
+        
+        // 현재 상태 확인
+        const statusResponse = await fetch(`/api/pcs/${pcId}/status`);
+        const statusData = await statusResponse.json();
+        const currentState = statusData.state;
+        
+        if (currentState === 'ubuntu') {
+            // Ubuntu 실행중이면 종료
+            await this.shutdownUbuntu(pcId);
+        } else if (currentState === 'windows') {
+            // Windows 실행중이면 Ubuntu로 재부팅
+            await this.rebootToUbuntu(pcId);
+        } else {
+            // 그 외의 경우는 Ubuntu 부팅 (WOL)
+            await this.bootUbuntu(pcId);
+        }
+    }
+    
+    async handleWindowsButton(pcId) {
+        const pc = this.pcs.get(pcId);
+        if (!pc) return;
+        
+        // 현재 상태 확인
+        const statusResponse = await fetch(`/api/pcs/${pcId}/status`);
+        const statusData = await statusResponse.json();
+        const currentState = statusData.state;
+        
+        if (currentState === 'windows') {
+            // Windows 실행중이면 종료
+            await this.shutdownWindows(pcId);
+        } else if (currentState === 'windows') {
+            // Windows에서 Ubuntu로 재부팅 (현재는 종료만 구현)
+            await this.shutdownWindows(pcId);
+        } else {
+            // 그 외의 경우는 Windows 부팅
+            await this.bootWindows(pcId);
+        }
+    }
+    
+    // 종료 메서드들
+    async shutdownUbuntu(pcId) {
+        try {
+            const response = await fetch(`/api/pcs/${pcId}/shutdown/ubuntu`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`Ubuntu 종료를 시작했습니다`, 'info');
+            } else {
+                this.showNotification(result.detail || 'Ubuntu 종료 요청 실패', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Ubuntu 종료 오류:', error);
+            this.showNotification('Ubuntu 종료 요청 중 오류가 발생했습니다', 'error');
+        }
+    }
+    
+    async shutdownWindows(pcId) {
+        try {
+            const response = await fetch(`/api/pcs/${pcId}/shutdown/windows`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`Windows 종료를 시작했습니다`, 'info');
+            } else {
+                this.showNotification(result.detail || 'Windows 종료 요청 실패', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Windows 종료 오류:', error);
+            this.showNotification('Windows 종료 요청 중 오류가 발생했습니다', 'error');
+        }
+    }
+    
+    async rebootToUbuntu(pcId) {
+        try {
+            const response = await fetch(`/api/pcs/${pcId}/reboot/ubuntu`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`Ubuntu로 재부팅을 시작했습니다`, 'info');
+            } else {
+                this.showNotification(result.detail || 'Ubuntu 재부팅 요청 실패', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Ubuntu 재부팅 오류:', error);
+            this.showNotification('Ubuntu 재부팅 요청 중 오류가 발생했습니다', 'error');
+        }
+    }
+    
     // 부팅 메서드들
     async bootUbuntu(pcId) {
         try {
@@ -727,11 +863,9 @@ class MultiPCController {
             const windowsBtn = document.getElementById(`windows-btn-${data.pc_id}`);
             if (ubuntuBtn && windowsBtn) {
                 if (data.target_os === 'Ubuntu') {
-                    ubuntuBtn.disabled = true;
-                    windowsBtn.disabled = false;
+                    this.updateButtonsForState('ubuntu', ubuntuBtn, windowsBtn);
                 } else if (data.target_os === 'Windows') {
-                    ubuntuBtn.disabled = false;
-                    windowsBtn.disabled = true;
+                    this.updateButtonsForState('windows', ubuntuBtn, windowsBtn);
                 }
             }
         }

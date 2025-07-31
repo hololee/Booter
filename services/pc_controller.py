@@ -445,6 +445,213 @@ class PCController:
 
         logger.info(f"PC {pc_id} 서비스 정리 완료: {len(to_remove)}개 작업 제거")
 
+    async def shutdown_ubuntu(self, pc_id: str) -> str:
+        """Ubuntu 종료"""
+        task_id = str(uuid.uuid4())
+        task = BootTask(pc_id, "Ubuntu Shutdown", task_id)
+        self.boot_tasks[task_id] = task
+
+        # 종료 시작 알림
+        from services.connection_manager import connection_manager
+
+        await connection_manager.notify_boot_start(task_id, pc_id, "Ubuntu Shutdown")
+
+        # 백그라운드에서 종료 프로세스 실행
+        asyncio.create_task(self._shutdown_ubuntu_process(task))
+
+        return task_id
+
+    async def _shutdown_ubuntu_process(self, task: BootTask):
+        """Ubuntu 종료 프로세스"""
+        from services.connection_manager import connection_manager
+
+        try:
+            wol_service, ssh_service, port_scanner = self._get_or_create_services(task.pc_id)
+
+            # 1. 현재 상태 확인
+            ubuntu_available, _ = await port_scanner.check_ubuntu_status()
+            if not ubuntu_available:
+                task.message = "Ubuntu가 실행 중이지 않습니다"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+                return
+
+            # 2. Ubuntu 종료 명령 실행
+            task.message = "Ubuntu 종료 명령 실행 중..."
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
+
+            success, shutdown_message = await ssh_service.shutdown_ubuntu()
+            if success:
+                task.message = "Ubuntu 종료 완료"
+                task.is_completed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, True, task.message
+                )
+            else:
+                task.message = f"Ubuntu 종료 실패: {shutdown_message}"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+
+        except Exception as e:
+            logger.error(f"Ubuntu 종료 프로세스 오류: {e}")
+            task.message = f"종료 오류: {str(e)}"
+            task.is_failed = True
+            await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
+
+    async def shutdown_windows(self, pc_id: str) -> str:
+        """Windows 종료"""
+        task_id = str(uuid.uuid4())
+        task = BootTask(pc_id, "Windows Shutdown", task_id)
+        self.boot_tasks[task_id] = task
+
+        # 종료 시작 알림
+        from services.connection_manager import connection_manager
+
+        await connection_manager.notify_boot_start(task_id, pc_id, "Windows Shutdown")
+
+        # 백그라운드에서 종료 프로세스 실행
+        asyncio.create_task(self._shutdown_windows_process(task))
+
+        return task_id
+
+    async def _shutdown_windows_process(self, task: BootTask):
+        """Windows 종료 프로세스"""
+        from services.connection_manager import connection_manager
+
+        try:
+            pc_config = pc_manager.get_pc(task.pc_id)
+            if not pc_config:
+                task.message = "PC 설정을 찾을 수 없습니다"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+                return
+
+            # Windows SSH 서비스 생성
+            windows_ssh = pc_config.get_windows_ssh()
+            windows_ssh_service = SSHService(windows_ssh, pc_config.ip_address)
+
+            # 1. 현재 상태 확인
+            wol_service, ssh_service, port_scanner = self._get_or_create_services(task.pc_id)
+            windows_available, _ = await port_scanner.check_windows_status()
+            if not windows_available:
+                task.message = "Windows가 실행 중이지 않습니다"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+                return
+
+            # 2. Windows 종료 명령 실행
+            task.message = "Windows 종료 명령 실행 중..."
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
+
+            success, shutdown_message = await windows_ssh_service.shutdown_windows()
+            if success:
+                task.message = "Windows 종료 완료"
+                task.is_completed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, True, task.message
+                )
+            else:
+                task.message = f"Windows 종료 실패: {shutdown_message}"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+
+        except Exception as e:
+            logger.error(f"Windows 종료 프로세스 오류: {e}")
+            task.message = f"종료 오류: {str(e)}"
+            task.is_failed = True
+            await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
+
+    async def reboot_to_ubuntu(self, pc_id: str) -> str:
+        """Windows에서 Ubuntu로 재부팅"""
+        task_id = str(uuid.uuid4())
+        task = BootTask(pc_id, "Ubuntu Reboot", task_id)
+        self.boot_tasks[task_id] = task
+
+        # 재부팅 시작 알림
+        from services.connection_manager import connection_manager
+
+        await connection_manager.notify_boot_start(task_id, pc_id, "Ubuntu Reboot")
+
+        # 백그라운드에서 재부팅 프로세스 실행
+        asyncio.create_task(self._reboot_to_ubuntu_process(task))
+
+        return task_id
+
+    async def _reboot_to_ubuntu_process(self, task: BootTask):
+        """Ubuntu 재부팅 프로세스"""
+        from services.connection_manager import connection_manager
+
+        try:
+            pc_config = pc_manager.get_pc(task.pc_id)
+            if not pc_config:
+                task.message = "PC 설정을 찾을 수 없습니다"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+                return
+
+            # Windows SSH 서비스 생성
+            windows_ssh = pc_config.get_windows_ssh()
+            windows_ssh_service = SSHService(windows_ssh, pc_config.ip_address)
+
+            # 1. 현재 상태 확인
+            wol_service, ssh_service, port_scanner = self._get_or_create_services(task.pc_id)
+            windows_available, _ = await port_scanner.check_windows_status()
+            if not windows_available:
+                task.message = "Windows가 실행 중이지 않습니다"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+                return
+
+            # 2. Ubuntu 재부팅 명령 실행
+            task.message = "Ubuntu 재부팅 명령 실행 중..."
+            await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
+
+            success, reboot_message = await windows_ssh_service.reboot_to_ubuntu()
+            if success:
+                # 3. Ubuntu 부팅 대기
+                task.message = "Ubuntu 부팅 중..."
+                await connection_manager.notify_boot_progress(task.task_id, task.pc_id, task.target_os, task.message)
+
+                ubuntu_success = await self._wait_for_ubuntu_boot(task, ssh_service)
+                if ubuntu_success:
+                    task.message = "Ubuntu 재부팅 완료"
+                    task.is_completed = True
+                    await connection_manager.notify_boot_complete(
+                        task.task_id, task.pc_id, task.target_os, True, task.message
+                    )
+                else:
+                    task.message = "Ubuntu 부팅 타임아웃"
+                    task.is_failed = True
+                    await connection_manager.notify_boot_complete(
+                        task.task_id, task.pc_id, task.target_os, False, task.message
+                    )
+            else:
+                task.message = f"Ubuntu 재부팅 실패: {reboot_message}"
+                task.is_failed = True
+                await connection_manager.notify_boot_complete(
+                    task.task_id, task.pc_id, task.target_os, False, task.message
+                )
+
+        except Exception as e:
+            logger.error(f"Ubuntu 재부팅 프로세스 오류: {e}")
+            task.message = f"재부팅 오류: {str(e)}"
+            task.is_failed = True
+            await connection_manager.notify_boot_complete(task.task_id, task.pc_id, task.target_os, False, task.message)
+
 
 # 전역 PC 컨트롤러 인스턴스
 pc_controller = PCController()

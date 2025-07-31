@@ -212,22 +212,6 @@ class SSHService:
             logger.debug(f"우분투 부팅 확인 실패: {message}")
             return False
 
-    async def boot_to_windows(self) -> Tuple[bool, str]:
-        """
-        bootWin 명령으로 윈도우 부팅 (.bashrc alias 사용, sudo 권한 필요)
-
-        Returns:
-            Tuple[bool, str]: (성공 여부, 메시지)
-        """
-        logger.info(f"윈도우 부팅 명령 실행: {self.boot_command}")
-
-        success, stdout, stderr = await self.execute_sudo_command(self.boot_command)
-
-        if success:
-            return True, f"윈도우 부팅 명령 실행 성공: {stdout.strip()}"
-        else:
-            return False, f"윈도우 부팅 명령 실행 실패: {stderr.strip()}"
-
     async def execute_sudo_command(self, command: str) -> Tuple[bool, str, str]:
         """
         sudo 권한이 필요한 명령 실행 (.bashrc alias 포함)
@@ -401,6 +385,82 @@ class SSHService:
             return False, "", str(e)
         finally:
             ssh.close()
+
+    async def boot_to_windows(self) -> Tuple[bool, str]:
+        """
+        윈도우로 부팅 (Ubuntu에서 실행)
+
+        Returns:
+            Tuple[bool, str]: (성공 여부, 메시지)
+        """
+        command = self.boot_command
+        # sudo 명령이 포함된 경우 execute_sudo_command 사용
+        if "sudo" in command:
+            success, stdout, stderr = await self.execute_sudo_command(command)
+        else:
+            success, stdout, stderr = await self.execute_command(command)
+
+        if success:
+            logger.info(f"윈도우 부팅 명령 실행 성공: {self.host}")
+            return True, "윈도우 부팅 명령 실행됨"
+        else:
+            error_msg = stderr or stdout or "명령 실행 실패"
+            logger.error(f"윈도우 부팅 명령 실행 실패: {error_msg}")
+            return False, f"윈도우 부팅 명령 실패: {error_msg}"
+
+    async def shutdown_ubuntu(self) -> Tuple[bool, str]:
+        """
+        Ubuntu 강제 종료
+
+        Returns:
+            Tuple[bool, str]: (성공 여부, 메시지)
+        """
+        command = "sudo shutdown -h now"
+        success, stdout, stderr = await self.execute_sudo_command(command)
+
+        if success:
+            logger.info(f"Ubuntu 종료 명령 실행 성공: {self.host}")
+            return True, "Ubuntu 종료 명령 실행됨"
+        else:
+            error_msg = stderr or stdout or "명령 실행 실패"
+            logger.error(f"Ubuntu 종료 명령 실행 실패: {error_msg}")
+            return False, f"Ubuntu 종료 명령 실패: {error_msg}"
+
+    async def shutdown_windows(self) -> Tuple[bool, str]:
+        """
+        Windows 강제 종료
+
+        Returns:
+            Tuple[bool, str]: (성공 여부, 메시지)
+        """
+        command = "shutdown /s /f /t 0"
+        success, stdout, stderr = await self.execute_command(command)
+
+        if success:
+            logger.info(f"Windows 종료 명령 실행 성공: {self.host}")
+            return True, "Windows 종료 명령 실행됨"
+        else:
+            error_msg = stderr or stdout or "명령 실행 실패"
+            logger.error(f"Windows 종료 명령 실행 실패: {error_msg}")
+            return False, f"Windows 종료 명령 실패: {error_msg}"
+
+    async def reboot_to_ubuntu(self) -> Tuple[bool, str]:
+        """
+        Ubuntu로 재부팅 (Windows에서 실행)
+
+        Returns:
+            Tuple[bool, str]: (성공 여부, 메시지)
+        """
+        command = "shutdown /r /f /t 0"
+        success, stdout, stderr = await self.execute_command(command)
+
+        if success:
+            logger.info(f"Ubuntu 재부팅 명령 실행 성공: {self.host}")
+            return True, "Ubuntu 재부팅 명령 실행됨"
+        else:
+            error_msg = stderr or stdout or "명령 실행 실패"
+            logger.error(f"Ubuntu 재부팅 명령 실행 실패: {error_msg}")
+            return False, f"Ubuntu 재부팅 명령 실패: {error_msg}"
 
 
 # 전역 SSH 서비스 인스턴스는 제거 (PC별로 개별 생성)
