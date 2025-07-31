@@ -100,8 +100,8 @@ class MultiPCController {
         this.confirmCancelBtn.addEventListener('click', () => this.confirmCancel());
         
         
-        // SSH 비밀번호 토글 이벤트
-        document.getElementById('sshPasswordToggle').addEventListener('click', () => this.togglePasswordVisibility());
+        // SSH 관련 이벤트 리스너들
+        this.initializeSSHEventListeners();
         
         // 모달 배경 클릭 시 닫기 비활성화 (PC 모달만)
         this.deleteModal.addEventListener('click', (e) => {
@@ -236,13 +236,10 @@ class MultiPCController {
                 const bootInfo = this.bootingPCs.get(pc.id);
                 this.updatePCBootStatus(pc.id, this.getBootingStatusText(bootInfo.targetOS, 'booting'), 'booting');
                 
-                // 부팅 중일 때 버튼 비활성화
+                // 부팅 중일 때 버튼 상태 업데이트
                 const ubuntuBtn = document.getElementById(`ubuntu-btn-${pc.id}`);
                 const windowsBtn = document.getElementById(`windows-btn-${pc.id}`);
-                if (ubuntuBtn && windowsBtn) {
-                    ubuntuBtn.disabled = true;
-                    windowsBtn.disabled = true;
-                }
+                this.updateButtonsForState('booting', ubuntuBtn, windowsBtn);
             }
         });
     }
@@ -259,7 +256,8 @@ class MultiPCController {
     
     createPCCard(pc) {
         const card = document.createElement('div');
-        card.className = 'pc-card';
+        const isDeprecated = pc.ssh_user || pc.ssh_password || pc.ssh_key_text || pc.rdp_port;
+        card.className = `pc-card${isDeprecated ? ' deprecated' : ''}`;
         card.id = `pc-${pc.id}`;
         
         card.innerHTML = `
@@ -297,11 +295,11 @@ class MultiPCController {
                     </div>
                 </div>
                 <div class="pc-boot-buttons">
-                    <button class="boot-btn ubuntu-btn" id="ubuntu-btn-${pc.id}" onclick="app.bootUbuntu('${pc.id}')">
-                        Ubuntu
+                    <button class="boot-btn ubuntu-btn" id="ubuntu-btn-${pc.id}" onclick="app.handleUbuntuButton('${pc.id}')">
+                        ubuntu UP
                     </button>
-                    <button class="boot-btn windows-btn" id="windows-btn-${pc.id}" onclick="app.bootWindows('${pc.id}')">
-                        Windows
+                    <button class="boot-btn windows-btn" id="windows-btn-${pc.id}" onclick="app.handleWindowsButton('${pc.id}')">
+                        windows UP
                     </button>
                 </div>
             </div>
@@ -349,9 +347,8 @@ class MultiPCController {
                 if (status.timestamp) {
                     lastCheck.textContent = this.formatTimestamp(status.timestamp);
                 }
-                // 부팅 중에는 모든 버튼 비활성화
-                ubuntuBtn.disabled = true;
-                windowsBtn.disabled = true;
+                // 부팅 중에는 모든 버튼 비활성화, 텍스트도 업데이트
+                this.updateButtonsForState('booting', ubuntuBtn, windowsBtn);
                 return; // 여기서 함수를 종료하여 '부팅 중' UI 유지
             }
         }
@@ -377,9 +374,8 @@ class MultiPCController {
             lastCheck.textContent = this.formatTimestamp(status.timestamp);
         }
         
-        // 버튼 상태 업데이트 (현재 상태에 따라서만)
-        ubuntuBtn.disabled = status.state === 'ubuntu' || status.state === 'windows';
-        windowsBtn.disabled = status.state === 'windows';
+        // 버튼 상태와 텍스트 업데이트 (상태에 따라)
+        this.updateButtonsForState(status.state, ubuntuBtn, windowsBtn);
     }
     
     
@@ -389,6 +385,13 @@ class MultiPCController {
         this.currentEditingPcId = null;
         this.modalTitle.textContent = 'PC 추가';
         this.pcForm.reset();
+        
+        // 기본값 설정
+        document.getElementById('ubuntuSshUser').value = 'ubuntu';
+        document.getElementById('ubuntuSshPort').value = '22';
+        document.getElementById('windowsSshUser').value = 'administrator';
+        document.getElementById('windowsSshPort').value = '22';
+        
         this.pcModal.classList.add('show');
     }
     
@@ -400,19 +403,46 @@ class MultiPCController {
         this.currentEditingPcId = pcId;
         this.modalTitle.textContent = 'PC 편집';
         
-        // 폼에 데이터 채우기
+        // 기본 정보 채우기
         document.getElementById('pcName').value = pc.name;
         document.getElementById('macAddress').value = pc.mac_address;
         document.getElementById('ipAddress').value = pc.ip_address;
-        document.getElementById('sshUser').value = pc.ssh_user;
-        document.getElementById('sshPort').value = pc.ssh_port;
-        document.getElementById('rdpPort').value = pc.rdp_port;
         document.getElementById('bootCommand').value = pc.boot_command;
         document.getElementById('description').value = pc.description || '';
         
-        // SSH 설정
-        document.getElementById('sshPassword').value = pc.ssh_password || '';
-        document.getElementById('sshKeyText').value = pc.ssh_key_text || '';
+        // deprecated 표시 및 알림
+        if (pc.ssh_user || pc.ssh_password || pc.ssh_key_text || pc.rdp_port) {
+            this.showDeprecatedFormatAlert();
+        }
+        
+        // Ubuntu SSH 설정
+        if (pc.ubuntu_ssh) {
+            document.getElementById('ubuntuSshUser').value = pc.ubuntu_ssh.user || 'ubuntu';
+            document.getElementById('ubuntuSshKeyText').value = pc.ubuntu_ssh.key_text || '';
+            document.getElementById('ubuntuSshPassword').value = pc.ubuntu_ssh.password || '';
+            document.getElementById('ubuntuSshPort').value = pc.ubuntu_ssh.port || 22;
+        } else {
+            // 하위 호환성을 위한 기존 필드 사용
+            document.getElementById('ubuntuSshUser').value = pc.ssh_user || 'ubuntu';
+            document.getElementById('ubuntuSshKeyText').value = pc.ssh_key_text || '';
+            document.getElementById('ubuntuSshPassword').value = pc.ssh_password || '';
+            document.getElementById('ubuntuSshPort').value = pc.ssh_port || 22;
+        }
+        
+        // Windows SSH 설정
+        if (pc.windows_ssh) {
+            document.getElementById('windowsSshUser').value = pc.windows_ssh.user || 'administrator';
+            document.getElementById('windowsSshKeyText').value = pc.windows_ssh.key_text || '';
+            document.getElementById('windowsSshPassword').value = pc.windows_ssh.password || '';
+            document.getElementById('windowsSshPort').value = pc.windows_ssh.port || 22;
+        } else {
+            // 기본값 설정
+            document.getElementById('windowsSshUser').value = 'administrator';
+            document.getElementById('windowsSshKeyText').value = '';
+            document.getElementById('windowsSshPassword').value = '';
+            document.getElementById('windowsSshPort').value = 22;
+        }
+        
         this.pcModal.classList.add('show');
     }
     
@@ -470,26 +500,34 @@ class MultiPCController {
             ? this.currentEditingPcId 
             : this.generatePcId(pcName);
         
+        // Ubuntu SSH 설정
+        const ubuntuSsh = {
+            user: formData.get('ubuntu_ssh_user') || 'ubuntu',
+            key_text: formData.get('ubuntu_ssh_key_text') || '',
+            password: formData.get('ubuntu_ssh_password') || '',
+            port: parseInt(formData.get('ubuntu_ssh_port')) || 22
+        };
+        
+        // Windows SSH 설정 (필수)
+        const windowsSsh = {
+            user: formData.get('windows_ssh_user') || 'administrator',
+            key_text: formData.get('windows_ssh_key_text') || '',
+            password: formData.get('windows_ssh_password') || '',
+            port: parseInt(formData.get('windows_ssh_port')) || 22
+        };
+        
         const pcData = {
             id: pcId,
             name: pcName,
             mac_address: formData.get('mac_address'),
             ip_address: formData.get('ip_address'),
-            ssh_user: formData.get('ssh_user'),
-            ssh_password: formData.get('ssh_password'),
-            ssh_key_text: formData.get('ssh_key_text'),
-            ssh_auth_method: formData.get('ssh_key_text') ? 'key' : 'password', // 키가 있으면 key, 없으면 password
-            ssh_port: parseInt(formData.get('ssh_port')),
-            rdp_port: parseInt(formData.get('rdp_port')),
+            ubuntu_ssh: ubuntuSsh,
+            windows_ssh: windowsSsh,
             boot_command: formData.get('boot_command'),
             description: formData.get('description')
         };
         
-        // SSH 비밀번호는 항상 필수
-        if (!pcData.ssh_password) {
-            this.showNotification('SSH 비밀번호를 입력해주세요', 'error');
-            return;
-        }
+        // 두 OS 모두 빈 비밀번호 허용
         
         console.log('Sending PC data:', pcData);
         
@@ -565,6 +603,147 @@ class MultiPCController {
         } catch (error) {
             console.error('PC 삭제 오류:', error);
             this.showNotification('PC 삭제 중 오류가 발생했습니다', 'error');
+        }
+    }
+    
+    // 버튼 상태 업데이트 메서드
+    updateButtonsForState(state, ubuntuBtn, windowsBtn) {
+        if (!ubuntuBtn || !windowsBtn) return;
+        
+        switch (state) {
+            case 'off':
+                // PC가 꺼짐: 두 버튼 활성화, "ubuntu UP", "windows UP"
+                ubuntuBtn.disabled = false;
+                windowsBtn.disabled = false;
+                ubuntuBtn.textContent = 'ubuntu UP';
+                windowsBtn.textContent = 'windows UP';
+                break;
+            case 'ubuntu':
+                // Ubuntu 실행중: "ubuntu DOWN", "windows UP" (둘 다 활성화)
+                ubuntuBtn.disabled = false;
+                windowsBtn.disabled = false;
+                ubuntuBtn.textContent = 'ubuntu DOWN';
+                windowsBtn.textContent = 'windows UP';
+                break;
+            case 'windows':
+                // Windows 실행중: "ubuntu UP", "windows DOWN" (둘 다 활성화)
+                ubuntuBtn.disabled = false;
+                windowsBtn.disabled = false;
+                ubuntuBtn.textContent = 'ubuntu UP';
+                windowsBtn.textContent = 'windows DOWN';
+                break;
+            case 'booting':
+            default:
+                // 부팅중이거나 알 수 없는 상태: 두 버튼 비활성화, "ubuntu UP", "windows UP"
+                ubuntuBtn.disabled = true;
+                windowsBtn.disabled = true;
+                ubuntuBtn.textContent = 'ubuntu UP';
+                windowsBtn.textContent = 'windows UP';
+                break;
+        }
+    }
+    
+    // 버튼 클릭 핸들러들
+    async handleUbuntuButton(pcId) {
+        const pc = this.pcs.get(pcId);
+        if (!pc) return;
+        
+        // 현재 상태 확인
+        const statusResponse = await fetch(`/api/pcs/${pcId}/status`);
+        const statusData = await statusResponse.json();
+        const currentState = statusData.state;
+        
+        if (currentState === 'ubuntu') {
+            // Ubuntu 실행중이면 종료
+            await this.shutdownUbuntu(pcId);
+        } else if (currentState === 'windows') {
+            // Windows 실행중이면 Ubuntu로 재부팅
+            await this.rebootToUbuntu(pcId);
+        } else {
+            // 그 외의 경우는 Ubuntu 부팅 (WOL)
+            await this.bootUbuntu(pcId);
+        }
+    }
+    
+    async handleWindowsButton(pcId) {
+        const pc = this.pcs.get(pcId);
+        if (!pc) return;
+        
+        // 현재 상태 확인
+        const statusResponse = await fetch(`/api/pcs/${pcId}/status`);
+        const statusData = await statusResponse.json();
+        const currentState = statusData.state;
+        
+        if (currentState === 'windows') {
+            // Windows 실행중이면 종료
+            await this.shutdownWindows(pcId);
+        } else if (currentState === 'windows') {
+            // Windows에서 Ubuntu로 재부팅 (현재는 종료만 구현)
+            await this.shutdownWindows(pcId);
+        } else {
+            // 그 외의 경우는 Windows 부팅
+            await this.bootWindows(pcId);
+        }
+    }
+    
+    // 종료 메서드들
+    async shutdownUbuntu(pcId) {
+        try {
+            const response = await fetch(`/api/pcs/${pcId}/shutdown/ubuntu`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`Ubuntu 종료를 시작했습니다`, 'info');
+            } else {
+                this.showNotification(result.detail || 'Ubuntu 종료 요청 실패', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Ubuntu 종료 오류:', error);
+            this.showNotification('Ubuntu 종료 요청 중 오류가 발생했습니다', 'error');
+        }
+    }
+    
+    async shutdownWindows(pcId) {
+        try {
+            const response = await fetch(`/api/pcs/${pcId}/shutdown/windows`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`Windows 종료를 시작했습니다`, 'info');
+            } else {
+                this.showNotification(result.detail || 'Windows 종료 요청 실패', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Windows 종료 오류:', error);
+            this.showNotification('Windows 종료 요청 중 오류가 발생했습니다', 'error');
+        }
+    }
+    
+    async rebootToUbuntu(pcId) {
+        try {
+            const response = await fetch(`/api/pcs/${pcId}/reboot/ubuntu`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showNotification(`Ubuntu로 재부팅을 시작했습니다`, 'info');
+            } else {
+                this.showNotification(result.detail || 'Ubuntu 재부팅 요청 실패', 'error');
+            }
+            
+        } catch (error) {
+            console.error('Ubuntu 재부팅 오류:', error);
+            this.showNotification('Ubuntu 재부팅 요청 중 오류가 발생했습니다', 'error');
         }
     }
     
@@ -684,11 +863,9 @@ class MultiPCController {
             const windowsBtn = document.getElementById(`windows-btn-${data.pc_id}`);
             if (ubuntuBtn && windowsBtn) {
                 if (data.target_os === 'Ubuntu') {
-                    ubuntuBtn.disabled = true;
-                    windowsBtn.disabled = false;
+                    this.updateButtonsForState('ubuntu', ubuntuBtn, windowsBtn);
                 } else if (data.target_os === 'Windows') {
-                    ubuntuBtn.disabled = false;
-                    windowsBtn.disabled = true;
+                    this.updateButtonsForState('windows', ubuntuBtn, windowsBtn);
                 }
             }
         }
@@ -849,19 +1026,37 @@ class MultiPCController {
         return finalId;
     }
     
-    togglePasswordVisibility() {
-        const passwordInput = document.getElementById('sshPassword');
-        const passwordToggleIcon = document.getElementById('passwordToggleIcon');
+    initializeSSHEventListeners() {
+        // 비밀번호 토글 버튼들
+        document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => this.togglePasswordVisibility(e));
+        });
+    }
+    
+    
+    togglePasswordVisibility(event) {
+        const btn = event.currentTarget;
+        const targetId = btn.getAttribute('data-target');
+        const passwordInput = document.getElementById(targetId);
+        const icon = btn.querySelector('.eye-icon');
         
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
-            passwordToggleIcon.src = '/static/resources/hide.svg';
-            passwordToggleIcon.alt = 'Hide Password';
+            icon.src = '/static/resources/hide.svg';
+            icon.alt = 'Hide Password';
         } else {
             passwordInput.type = 'password';
-            passwordToggleIcon.src = '/static/resources/show.svg';
-            passwordToggleIcon.alt = 'Show Password';
+            icon.src = '/static/resources/show.svg';
+            icon.alt = 'Show Password';
         }
+    }
+    
+    showDeprecatedFormatAlert() {
+        this.showNotification(
+            '이 PC는 구 버전 포맷을 사용합니다. 새로운 Ubuntu/Windows SSH 설정으로 업데이트해주세요.', 
+            'warning', 
+            10000
+        );
     }
     
     // 취소 확인 모달 표시

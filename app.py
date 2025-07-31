@@ -122,6 +122,39 @@ async def boot_windows(pc_id: str):
     return {"status": "success", "message": "Windows boot initiated", "task_id": result}
 
 
+@app.post("/api/pcs/{pc_id}/shutdown/ubuntu")
+async def shutdown_ubuntu(pc_id: str):
+    """Ubuntu 종료"""
+    pc = pc_manager.get_pc(pc_id)
+    if not pc:
+        raise HTTPException(status_code=404, detail="PC not found")
+
+    result = await pc_controller.shutdown_ubuntu(pc_id)
+    return {"status": "success", "message": "Ubuntu shutdown initiated", "task_id": result}
+
+
+@app.post("/api/pcs/{pc_id}/shutdown/windows")
+async def shutdown_windows(pc_id: str):
+    """Windows 종료"""
+    pc = pc_manager.get_pc(pc_id)
+    if not pc:
+        raise HTTPException(status_code=404, detail="PC not found")
+
+    result = await pc_controller.shutdown_windows(pc_id)
+    return {"status": "success", "message": "Windows shutdown initiated", "task_id": result}
+
+
+@app.post("/api/pcs/{pc_id}/reboot/ubuntu")
+async def reboot_to_ubuntu(pc_id: str):
+    """Windows에서 Ubuntu로 재부팅"""
+    pc = pc_manager.get_pc(pc_id)
+    if not pc:
+        raise HTTPException(status_code=404, detail="PC not found")
+
+    result = await pc_controller.reboot_to_ubuntu(pc_id)
+    return {"status": "success", "message": "Ubuntu reboot initiated", "task_id": result}
+
+
 @app.get("/api/pcs/{pc_id}/status")
 async def get_pc_status(pc_id: str):
     """PC 상태 확인"""
