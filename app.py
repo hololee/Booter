@@ -36,6 +36,12 @@ async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/offline", response_class=HTMLResponse)
+async def offline(request: Request):
+    """오프라인 페이지"""
+    return templates.TemplateResponse("offline.html", {"request": request})
+
+
 # PC 관리 API
 @app.get("/api/pcs")
 async def get_all_pcs():
