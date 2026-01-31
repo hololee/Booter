@@ -101,8 +101,12 @@ class PCController:
             wol_service, ssh_service, port_scanner = self._get_or_create_services(pc_id)
 
             # 병렬로 Ubuntu SSH와 Windows SSH 연결 확인
-            ubuntu_available, ubuntu_msg = await port_scanner.check_ubuntu_status()
-            windows_available, windows_msg = await port_scanner.check_windows_status()
+            ubuntu_task = port_scanner.check_ubuntu_status()
+            windows_task = port_scanner.check_windows_status()
+            
+            (ubuntu_available, ubuntu_msg), (windows_available, windows_msg) = await asyncio.gather(
+                ubuntu_task, windows_task
+            )
 
             # 상태 결정
             old_state = self.pc_states.get(pc_id, PCState.UNKNOWN)
@@ -160,24 +164,28 @@ class PCController:
     async def get_all_pc_status(self) -> dict:
         """모든 활성 PC 상태 확인"""
         pcs = pc_manager.get_active_pcs()
+        if not pcs:
+            return {}
+
+        # 모든 PC의 상태 확인을 병렬로 실행
+        pc_ids = [pc.id for pc in pcs]
+        tasks = [self.get_pc_status(pc_id) for pc_id in pc_ids]
+        
+        # return_exceptions=True를 사용하여 특정 PC에서 오류가 나도 다른 PC 확인에 영향을 주지 않음
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         statuses = {}
-
-        # 병렬로 모든 PC 상태 확인
-        tasks = []
-        for pc in pcs:
-            task = asyncio.create_task(self.get_pc_status(pc.id))
-            tasks.append((pc.id, task))
-
-        for pc_id, task in tasks:
-            try:
-                status = await task
-                statuses[pc_id] = status
-            except Exception as e:
+        for pc_id, result in zip(pc_ids, results):
+            if isinstance(result, Exception):
+                logger.error(f"PC {pc_id} 상태 확인 중 예외 발생: {result}")
                 statuses[pc_id] = {
                     "pc_id": pc_id,
                     "state": PCState.UNKNOWN.value,
-                    "error": str(e),
+                    "error": str(result),
+                    "timestamp": datetime.now().isoformat(),
                 }
+            else:
+                statuses[pc_id] = result
 
         return statuses
 

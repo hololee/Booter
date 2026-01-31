@@ -182,16 +182,7 @@ async def get_pc_status(pc_id: str):
 @app.get("/api/status")
 async def get_all_status():
     """모든 PC 상태 확인"""
-    pcs = pc_manager.get_active_pcs()
-    statuses = {}
-
-    for pc in pcs:
-        try:
-            status = await pc_controller.get_pc_status(pc.id)
-            statuses[pc.id] = status
-        except Exception as e:
-            statuses[pc.id] = {"error": str(e)}
-
+    statuses = await pc_controller.get_all_pc_status()
     return {"statuses": statuses}
 
 

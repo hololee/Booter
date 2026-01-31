@@ -133,8 +133,13 @@ class WindowsStatusChecker:
         Returns:
             dict: 연결성 테스트 결과
         """
-        ubuntu_available, ubuntu_msg = await self.check_ubuntu_status()
-        windows_available, windows_msg = await self.check_windows_status()
+        # 병렬로 상태 확인 실행
+        ubuntu_task = self.check_ubuntu_status()
+        windows_task = self.check_windows_status()
+        
+        (ubuntu_available, ubuntu_msg), (windows_available, windows_msg) = await asyncio.gather(
+            ubuntu_task, windows_task
+        )
 
         return {
             "ubuntu_available": ubuntu_available,

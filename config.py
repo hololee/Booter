@@ -124,8 +124,8 @@ class Config:
 
     # 타임아웃 설정
     BOOT_TIMEOUT = int(os.getenv("BOOT_TIMEOUT", "300"))  # 5분
-    SSH_TIMEOUT = int(os.getenv("SSH_TIMEOUT", "10"))
-    PORT_SCAN_TIMEOUT = int(os.getenv("PORT_SCAN_TIMEOUT", "5"))
+    SSH_TIMEOUT = int(os.getenv("SSH_TIMEOUT", "2"))
+    PORT_SCAN_TIMEOUT = int(os.getenv("PORT_SCAN_TIMEOUT", "2"))
 
     # 상태 확인 간격 (초)
     STATUS_CHECK_INTERVAL = int(os.getenv("STATUS_CHECK_INTERVAL", "5"))
