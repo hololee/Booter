@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Optional, Tuple
 
@@ -30,7 +30,7 @@ class BootTask:
         self.task_id = task_id
         self.pc_id = pc_id
         self.target_os = target_os
-        self.start_time = datetime.now()
+        self.start_time = datetime.now(timezone.utc)
         self.status = "starting"
         self.message = f"{target_os} 부팅 시작"
         self.is_completed = False
@@ -137,7 +137,7 @@ class PCController:
                 "windows_available": windows_available,
                 "ubuntu_message": ubuntu_msg,
                 "windows_message": windows_msg,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 "active_tasks": len(active_tasks),
                 # 하위 호환성을 위한 필드들
                 "ssh_available": ubuntu_available,
@@ -154,7 +154,7 @@ class PCController:
                 "windows_available": False,
                 "ubuntu_message": "상태 확인 오류",
                 "windows_message": "상태 확인 오류",
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 "error": str(e),
                 # 하위 호환성을 위한 필드들
                 "ssh_available": False,
@@ -182,7 +182,7 @@ class PCController:
                     "pc_id": pc_id,
                     "state": PCState.UNKNOWN.value,
                     "error": str(result),
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 }
             else:
                 statuses[pc_id] = result
@@ -404,7 +404,7 @@ class PCController:
             "target_os": task.target_os,
             "status": ("completed" if task.is_completed else "failed" if task.is_failed else "running"),
             "message": task.message,
-            "start_time": task.start_time.isoformat(),
+            "start_time": task.start_time.strftime('%Y-%m-%dT%H:%M:%SZ'),
             "is_completed": task.is_completed,
             "is_failed": task.is_failed,
         }

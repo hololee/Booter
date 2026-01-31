@@ -6,7 +6,7 @@ VM 컨트롤러 서비스
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from config import VMConfig, vm_manager
@@ -25,13 +25,12 @@ class VMStatus:
         self.status = "unknown"  # running, stopped, starting, unknown
         self.last_updated = None
         self.error_message = None
-
     def to_dict(self) -> Dict:
         return {
             "vm_id": self.vm_id,
             "vm_name": self.vm_name,
             "status": self.status,
-            "last_updated": datetime.fromtimestamp(self.last_updated).isoformat() if self.last_updated else None,
+            "last_updated": datetime.fromtimestamp(self.last_updated, tz=timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ') if self.last_updated else None,
             "error_message": self.error_message,
         }
 

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import WebSocket
@@ -117,7 +117,7 @@ class ConnectionManager:
                     "active_tasks": active_tasks,
                     "total_pcs": len(all_pc_statuses),
                     "total_vms": len(all_vm_statuses),
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
                 },
             }
 
